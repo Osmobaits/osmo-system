@@ -1,0 +1,16 @@
+# Środowisko wirtualne
+venv/
+
+# Pliki cache Pythona
+__pycache__/
+*.pyc
+
+# Plik bazy danych SQLite
+*.db
+*.sqlite3
+
+# Folder z załącznikami (jeśli nie chcesz ich wersjonować)
+uploads/
+
+# Pliki środowiskowe
+.env

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Edytuj Partię{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3>Edytuj partię produkcyjną</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Produkt:</strong> {{ batch.finished_product.name }}</p>
+                <p><strong>Data produkcji:</strong> {{ batch.order_date | localdatetime }}</p>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Wyprodukowana ilość:</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" value="{{ batch.quantity_produced }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                    <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

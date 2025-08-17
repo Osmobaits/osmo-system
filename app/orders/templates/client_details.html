@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Szczegóły Klienta: {{ client.name }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Klient: {{ client.name }}</h1>
+        <a href="{{ url_for('orders.manage_clients') }}" class="btn btn-secondary">Powrót do pulpitu</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h3>Zamówienia Aktywne</h3></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.add_order', id=client.id) }}" class="mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Utwórz nowe zamówienie</button>
+                    </form>
+                    <ul class="list-group">
+                        {% for order in client.orders if not order.is_archived %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Zamówienie z {{ order.order_date.strftime('%Y-%m-%d') }}
+                            <a href="{{ url_for('orders.order_details', id=order.id) }}" class="btn btn-info btn-sm">Szczegóły</a>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">Brak aktywnych zamówień.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+             <div class="card shadow-sm">
+                <div class="card-header"><h3>Archiwum Zamówień</h3></div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for order in client.orders if order.is_archived %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                Zamówienie z {{ order.order_date.strftime('%Y-%m-%d') }}
+                                {% if order.invoice_number %}
+                                    <span class="badge bg-success">Faktura: {{ order.invoice_number }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Brak faktury</span>
+                                {% endif %}
+                                </div>
+                            <div>
+                                <a href="{{ url_for('orders.order_details', id=order.id) }}" class="btn btn-secondary btn-sm">Podgląd</a>
+                                <form method="POST" action="{{ url_for('orders.delete_archived_order', id=order.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz trwale usunąć to zamówienie?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                </form>
+                            </div>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">Brak zarchiwizowanych zamówień.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h3>Dedykowane produkty klienta</h3></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.add_client_product', id=client.id) }}" class="mb-4">
+                        <div class="input-group">
+                            <input type="text" name="product_name" class="form-control" placeholder="Nazwa nowej przynęty" required>
+                            <button class="btn btn-success" type="submit">Dodaj</button>
+                        </div>
+                    </form>
+                    <ul class="list-group">
+                        {% for product in client.products %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ product.product_name }}
+                            <form method="POST" action="{{ url_for('orders.delete_client_product', id=product.id) }}">
+                                <button type="submit" class="btn btn-danger btn-sm">X</button>
+                            </form>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">Brak dedykowanych produktów.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

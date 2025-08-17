@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Wszystkie Zadania{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Wszystkie zadania w systemie</h1>
+        <a href="{{ url_for('admin.manage_users') }}" class="btn btn-secondary">Powrót do użytkowników</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Tytuł</th>
+                        <th>Dla</th>
+                        <th>Od</th>
+                        <th>Status</th>
+                        <th>Priorytet</th>
+                        <th>Termin</th>
+                        <th></th> </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.title }}</td>
+                        <td>{{ task.assignee.username }}</td>
+                        <td>{{ task.assigner.username }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if task.status == 'Nowe' %} bg-primary
+                                {% elif task.status == 'Przyjęte' %} bg-info text-dark
+                                {% elif task.status == 'Zakończone' %} bg-success
+                                {% endif %}
+                            ">{{ task.status }}</span>
+                        </td>
+                        <td>
+                            {% if task.priority == 2 %}<span class="badge bg-warning text-dark">Wysoki</span>
+                            {% elif task.priority == 3 %}<span class="badge bg-danger">Krytyczny</span>
+                            {% else %}<span class="badge bg-secondary">Normalny</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.due_date.strftime('%Y-%m-%d') if task.due_date else 'Brak' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('tasks.task_details', id=task.id) }}" class="btn btn-primary btn-sm">Zobacz</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">Brak zadań w systemie.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

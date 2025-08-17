@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Zarządzaj Użytkownikami{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Panel Administratora - Zarządzanie Użytkownikami</h1>
+        <a href="{{ url_for('admin.all_tasks') }}" class="btn btn-info">Zobacz wszystkie zadania</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header"><h3>Utwórz nowego użytkownika</h3></div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.manage_users') }}">
+                <div class="row align-items-end">
+                    <div class="col-md-4"><label class="form-label">Nazwa użytkownika</label><input type="text" name="username" class="form-control" required></div>
+                    <div class="col-md-4"><label class="form-label">Adres e-mail</label><input type="email" name="email" class="form-control" required></div>
+                    <div class="col-md-4"><label class="form-label">Hasło</label><input type="password" name="password" class="form-control" required></div>
+                </div>
+                <button type="submit" class="btn btn-success mt-3">Utwórz</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Użytkownicy i uprawnienia</h3></div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Użytkownik</th>
+                        <th>E-mail</th>
+                        {% for role in roles %}
+                            <th class="text-center">{{ role.name.capitalize() }}</th>
+                        {% endfor %}
+                        <th class="text-end">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <form method="POST" action="{{ url_for('admin.assign_roles', user_id=user.id) }}">
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email or 'Brak' }}</td>
+                            {% for role in roles %}
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input" name="roles" value="{{ role.id }}" 
+                                    {% if role in user.roles %}checked{% endif %}
+                                    {% if user.username == 'admin' and role.name == 'admin' %}disabled{% endif %}>
+                                </td>
+                            {% endfor %}
+                            <td class="text-end">
+                                <button type="submit" class="btn btn-primary btn-sm">Zapisz Role</button>
+                                <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="btn btn-info btn-sm">Edytuj</a>
+                                <a href="{{ url_for('admin.change_password', user_id=user.id) }}" class="btn btn-warning btn-sm">Zmień hasło</a>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

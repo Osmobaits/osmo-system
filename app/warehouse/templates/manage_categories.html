@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Zarządzaj Kategoriami</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+
+    <h1 class="text-center mb-4">Zarządzaj Kategoriami Surowców</h1>
+    <div class="mb-4">
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">Powrót do Magazynu</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header"><h3>Dodaj nową kategorię</h3></div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('warehouse.manage_categories') }}">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="name" placeholder="Nazwa nowej kategorii" required>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Istniejące kategorie</h3></div>
+        <div class="card-body">
+            <ul class="list-group">
+                {% for category in categories %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <form method="POST" action="{{ url_for('warehouse.edit_category', id=category.id) }}" class="d-flex flex-grow-1">
+                        <input type="text" class="form-control" name="name" value="{{ category.name }}">
+                        <button type="submit" class="btn btn-success ms-2">Zapisz</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('warehouse.delete_category', id=category.id) }}" onsubmit="return confirm('Czy na pewno chcesz usunąć tę kategorię? Usunięte zostaną również wszystkie surowce w tej kategorii!');" class="ms-2">
+                        <button type="submit" class="btn btn-danger">Usuń</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="list-group-item text-center">Brak zdefiniowanych kategorii.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

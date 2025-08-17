@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Edytuj Zadanie{% endblock %}
+{% block content %}
+    <style>
+        .user-select-container { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; border: 1px solid #dee2e6; border-radius: 0.375rem; }
+        .user-tile { display: block; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 20px; cursor: pointer; user-select: none; transition: all 0.2s ease-in-out; }
+        .user-tile input { display: none; }
+        .user-tile input:checked + label { background-color: #0d6efd; color: white; border-color: #0d6efd; }
+        .user-tile label { cursor: pointer; margin-bottom: 0; }
+    </style>
+
+    <h1 class="mb-4">Edycja Zadania: {{ task.title }}</h1>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Tytuł zadania</label>
+                    <input type="text" id="title" name="title" class="form-control" value="{{ task.title }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Przypisz do pracowników</label>
+                    <div class="user-select-container">
+                        {% for user in users %}
+                            <div class="user-tile">
+                                <input type="checkbox" name="assignee_ids" value="{{ user.id }}" id="user-{{ user.id }}" {% if user in task.assignees %}checked{% endif %}>
+                                <label for="user-{{ user.id }}">{{ user.username }}</label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="priority" class="form-label">Priorytet</label>
+                        <select id="priority" name="priority" class="form-select">
+                            <option value="1" {% if task.priority == 1 %}selected{% endif %}>Normalny</option>
+                            <option value="2" {% if task.priority == 2 %}selected{% endif %}>Wysoki</option>
+                            <option value="3" {% if task.priority == 3 %}selected{% endif %}>Krytyczny</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="due_date" class="form-label">Data realizacji</label>
+                        <input type="date" id="due_date" name="due_date" class="form-control" value="{{ task.due_date.strftime('%Y-%m-%d') if task.due_date }}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Treść zadania</label>
+                    <textarea id="description" name="description" class="form-control" rows="5">{{ task.description or '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Zapisz zmiany</button>
+                <a href="{{ url_for('tasks.task_details', id=task.id) }}" class="btn btn-secondary">Anuluj</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

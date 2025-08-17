@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Zamówienie #{{ order.id }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Szczegóły Zamówienia #{{ order.id }} dla {{ order.client.name }}</h1>
+            {% if order.is_archived %}
+                <span class="badge bg-secondary fs-6">Zamówienie zarchiwizowane</span>
+                {% if order.invoice_number %}
+                    <span class="badge bg-success fs-6">Faktura: {{ order.invoice_number }}</span>
+                {% endif %}
+            {% endif %}
+        </div>
+        <a href="{{ url_for('orders.client_details', id=order.client.id) }}" class="btn btn-secondary">Powrót do klienta</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="{% if not order.is_archived %}col-md-7{% else %}col-md-12{% endif %}">
+            <div class="card shadow-sm">
+                <div class="card-header"><h3>Produkty w zamówieniu</h3></div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Produkt</th><th>Zamówiono</th><th>Spakowane</th><th>Wykulane</th>
+                                {% if not order.is_archived %}<th>Akcje</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.products_in_order %}
+                            <tr>
+                                <td>{{ item.product_name }}</td>
+                                <td>{{ item.quantity_ordered }}</td>
+                                <td class="{% if not order.is_archived %}editable{% endif %}" data-id="{{ item.id }}" data-field="quantity_packed">{{ item.quantity_packed }}</td>
+                                <td class="{% if not order.is_archived %}editable{% endif %}" data-id="{{ item.id }}" data-field="quantity_wykulane">{{ item.quantity_wykulane }}</td>
+                                {% if not order.is_archived %}
+                                <td>
+                                    <form method="POST" action="{{ url_for('orders.delete_order_product', id=item.id) }}" onsubmit="return confirm('Czy na pewno usunąć?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                    </form>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="{% if not order.is_archived %}5{% else %}4{% endif %}" class="text-center">Zamówienie jest puste.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        {% if not order.is_archived %}
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-header"><h3>Dodaj produkt do zamówienia</h3></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.order_details', id=order.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Wybierz produkt z katalogu klienta</label>
+                            <select name="client_product_id" class="form-select" required>
+                                <option value="">Wybierz przynętę...</option>
+                                {% for product in client_products %}<option value="{{ product.id }}">{{ product.product_name }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ilość</label>
+                            <input type="number" name="quantity" class="form-control" min="1" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Dodaj produkt</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card shadow-sm mt-5">
+        {% if order.is_archived %}
+            <div class="card-header bg-info"><h3>Zaktualizuj numer faktury</h3></div>
+            <div class="card-body">
+                <p>To zamówienie jest już w archiwum. Możesz dodać lub zmienić numer powiązanej faktury.</p>
+                <form method="POST" action="{{ url_for('orders.archive_order', id=order.id) }}">
+                    <div class="input-group">
+                        <input type="text" name="invoice_number" class="form-control" placeholder="Numer faktury" value="{{ order.invoice_number or '' }}">
+                        <button type="submit" class="btn btn-primary">Zaktualizuj Fakturę</button>
+                    </div>
+                </form>
+            </div>
+        {% else %}
+            <div class="card-header bg-warning"><h3>Zakończ zamówienie</h3></div>
+            <div class="card-body">
+                <p>Aby zakończyć zamówienie i przenieść je do archiwum, opcjonalnie wpisz numer faktury i kliknij przycisk.</p>
+                <form method="POST" action="{{ url_for('orders.archive_order', id=order.id) }}">
+                    <div class="input-group">
+                        <input type="text" name="invoice_number" class="form-control" placeholder="Numer faktury (opcjonalnie)">
+                        <button type="submit" class="btn btn-success">Zakończ i Archiwizuj</button>
+                    </div>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.editable').forEach(cell => {
+        cell.addEventListener('click', function() {
+            if (this.querySelector('input')) return;
+            const originalValue = this.textContent.trim();
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'form-control form-control-sm';
+            input.value = originalValue;
+            this.innerHTML = '';
+            this.appendChild(input);
+            input.focus();
+            const saveChanges = () => {
+                const newValue = input.value;
+                const fieldName = this.dataset.field;
+                const recordId = this.dataset.id;
+                this.innerHTML = newValue;
+                fetch(`/orders/order/update_product_quantity/${recordId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [fieldName]: newValue }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        this.innerHTML = originalValue;
+                        alert('Wystąpił błąd podczas zapisu.');
+                    }
+                });
+            };
+            input.addEventListener('blur', saveChanges);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') input.blur();
+                else if (e.key === 'Escape') this.innerHTML = originalValue;
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

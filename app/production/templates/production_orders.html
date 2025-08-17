@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Zlecenia Produkcyjne{% endblock %}
+
+{% block content %}
+    <h1 class="text-center mb-4">Zlecenia Produkcyjne</h1>
+    <div class="mb-4">
+        <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Powrót do Produktów</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header"><h3>Utwórz nowe zlecenie produkcyjne</h3></div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Produkt do wyprodukowania</label>
+                        <select class="form-select" name="product_id" required>
+                            <option value="">Wybierz produkt...</option>
+                            {% for product in products %}
+                            <option value="{{ product.id }}">{{ product.name }} (na stanie: {{ product.quantity_in_stock }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Liczba porcji wsadzie (mnożnik receptury)</label>
+                        <input type="number" min="1" class="form-control" name="batch_size" required>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Produkuj</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Historia Zleceń Produkcyjnych</h3></div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Nazwa Produktu</th>
+                        <th>Ilość Wyprodukowana</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order.order_date | localdatetime }}</td>
+                        <td>{{ order.finished_product.name }}</td>
+                        <td>{{ order.quantity_produced }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center">Brak historii zleceń.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

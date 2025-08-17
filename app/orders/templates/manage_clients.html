@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Klienci i Zamówienia{% endblock %}
+
+{% block content %}
+    <h1 class="text-center mb-4">Pulpit Zamówień</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h3>Aktywne Zamówienia (w trakcie realizacji)</h3></div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for order in active_orders %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div><span class="fw-bold">{{ order.client.name }}</span> - zamówienie z {{ order.order_date.strftime('%Y-%m-%d') }}</div>
+                            <a href="{{ url_for('orders.order_details', id=order.id) }}" class="btn btn-info btn-sm">Przejdź do zamówienia</a>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">Brak aktywnych zamówień.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning"><h3>Zamówienia do Zafakturowania</h3></div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for order in orders_to_invoice %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold">{{ order.client.name }}</span> - zakończone {{ order.order_date.strftime('%Y-%m-%d') }}
+                                <span class="badge bg-danger ms-2">Brak faktury</span>
+                                </div>
+                            <a href="{{ url_for('orders.order_details', id=order.id) }}" class="btn btn-secondary btn-sm">Dodaj fakturę</a>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">Brak zamówień do zafakturowania.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header"><h3>Lista Klientów</h3></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.manage_clients') }}" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" name="name" class="form-control" placeholder="Nowy klient" required>
+                            <button type="submit" class="btn btn-success">Dodaj</button>
+                        </div>
+                    </form>
+                    <ul class="list-group">
+                        {% for client in clients %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{{ url_for('orders.client_details', id=client.id) }}" class="text-decoration-none text-dark fw-bold">{{ client.name }}</a>
+                            <div>
+                                <form method="POST" action="{{ url_for('orders.add_order', id=client.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-primary btn-sm">Nowe Zamówienie</button>
+                                </form>
+                                <a href="{{ url_for('orders.client_details', id=client.id) }}" class="btn btn-secondary btn-sm">Szczegóły</a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

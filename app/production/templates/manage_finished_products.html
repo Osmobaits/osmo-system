@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Historia Produkcji{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Panel Produkcji - Historia Partii</h1>
+        <div>
+            <a href="{{ url_for('production.manage_catalogue') }}" class="btn btn-info">Zarządzaj Katalogiem Produktów</a>
+            <a href="{{ url_for('production.manage_production_orders') }}" class="btn btn-primary">Nowe Zlecenie Produkcyjne &raquo;</a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Historia Produkcji (Partie)</h3></div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Data Produkcji</th>
+                        <th>Nazwa Produktu</th>
+                        <th>Wyprodukowana Ilość</th>
+                        <th class="text-end">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in production_history %}
+                    <tr>
+                        <td>{{ batch.order_date | localdatetime }}</td>
+                        <td>{{ batch.finished_product.name }}</td>
+                        <td>{{ batch.quantity_produced }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('production.edit_batch', order_id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
+                            <form method="POST" action="{{ url_for('production.delete_batch', order_id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć ten wpis z historii produkcji?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">Brak historii produkcji.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

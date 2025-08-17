@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Katalog Produktów Gotowych{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Katalog Produktów Gotowych</h1>
+        <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Powrót do Historii Produkcji</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-header"><h3>Dodaj nowy produkt do katalogu</h3></div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('production.manage_catalogue') }}">
+                <div class="row">
+                    <div class="col-md-8"><input type="text" class="form-control" name="name" placeholder="Nazwa nowego produktu" required></div>
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <input type="number" step="0.001" class="form-control" name="packaging_weight" placeholder="Waga opakowania" required>
+                            <span class="input-group-text">kg</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Dodaj</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Istniejące produkty w katalogu</h3></div>
+        <div class="card-body">
+            <ul class="list-group">
+                {% for product in products %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}" class="d-flex flex-grow-1 align-items-center">
+                        <input type="text" class="form-control me-2" name="name" value="{{ product.name }}">
+                        <div class="input-group me-3" style="width: 150px;">
+                            <input type="number" step="0.001" class="form-control" name="packaging_weight" value="{{ product.packaging_weight_kg }}">
+                            <span class="input-group-text">kg</span>
+                        </div>
+                        <button type="submit" class="btn btn-success">Zapisz</button>
+                    </form>
+                    <div class="ms-2">
+                        <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info">Receptura</a>
+                        <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');" style="display:inline;">
+                            <button type="submit" class="btn btn-danger">Usuń</button>
+                        </form>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-center">Brak produktów w katalogu.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
