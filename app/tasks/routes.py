@@ -26,9 +26,21 @@ def stream():
 @login_required
 @permission_required('tasks')
 def index():
-    tasks_assigned_to_me = current_user.assigned_tasks
-    tasks_created_by_me = Task.query.filter_by(assigner_id=current_user.id).order_by(Task.creation_date.desc()).all()
+    tasks_assigned_to_me = Task.query.filter(Task.assignees.contains(current_user), Task.status != 'Zakończone').order_by(Task.creation_date.desc()).all()
+    tasks_created_by_me = Task.query.filter(Task.assigner_id == current_user.id, Task.status != 'Zakończone').order_by(Task.creation_date.desc()).all()
     return render_template('tasks_list.html', assigned_tasks=tasks_assigned_to_me, created_tasks=tasks_created_by_me)
+
+@bp.route('/archive')
+@login_required
+@permission_required('tasks')
+def archive():
+    # === POPRAWIONA LOGIKA PONIŻEJ ===
+    completed_tasks = Task.query.filter(
+        db.or_(Task.assignees.contains(current_user), Task.assigner_id == current_user.id),
+        Task.status == 'Zakończone'
+    ).order_by(Task.creation_date.desc()).all()
+    
+    return render_template('tasks_archive.html', tasks=completed_tasks)
 
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
@@ -41,21 +53,17 @@ def create_task():
         priority = request.form.get('priority')
         due_date_str = request.form.get('due_date')
         files = request.files.getlist('attachments')
-
         if not title or not assignee_ids:
             flash("Tytuł i przynajmniej jeden pracownik są wymagane.", "warning")
             return redirect(url_for('tasks.create_task'))
-        
         due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
         new_task = Task(
             title=title, description=description, assigner_id=current_user.id,
             priority=int(priority), due_date=due_date
         )
-        
         assignees = User.query.filter(User.id.in_(assignee_ids)).all()
         new_task.assignees.extend(assignees)
         db.session.add(new_task)
-        
         for file in files:
             if file and file.filename != '':
                 filename = secure_filename(file.filename)
@@ -63,9 +71,7 @@ def create_task():
                 file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
                 attachment = TaskAttachment(task=new_task, filename=filename, filepath=filename)
                 db.session.add(attachment)
-        
         db.session.commit()
-
         try:
             for assignee in assignees:
                 if assignee.email:
@@ -75,9 +81,7 @@ def create_task():
             flash("Zadanie zostało utworzone, a pracownicy poinformowani.", "success")
         except Exception as e:
             flash(f"Zadanie utworzono, ale wystąpił błąd przy wysyłce e-maili: {e}", "danger")
-
         return redirect(url_for('tasks.index'))
-
     users = User.query.order_by(User.username).all()
     return render_template('create_task.html', users=users)
 
@@ -99,7 +103,6 @@ def edit_task(id):
     if task.assigner_id != current_user.id and not current_user.has_role('admin'):
         flash("Nie masz uprawnień do edycji tego zadania.", "danger")
         return redirect(url_for('tasks.index'))
-
     if request.method == 'POST':
         task.title = request.form.get('title')
         task.description = request.form.get('description')
@@ -107,14 +110,11 @@ def edit_task(id):
         task.priority = int(request.form.get('priority'))
         due_date_str = request.form.get('due_date')
         task.due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
-        
         assignees = User.query.filter(User.id.in_(assignee_ids)).all()
         task.assignees = assignees
-        
         db.session.commit()
         flash("Zadanie zostało zaktualizowane.", "success")
         return redirect(url_for('tasks.task_details', id=task.id))
-
     users = User.query.order_by(User.username).all()
     return render_template('edit_task.html', task=task, users=users)
 
@@ -126,7 +126,6 @@ def accept_task(id):
     if current_user in task.assignees and task.status == 'Nowe':
         task.status = 'Przyjęte'
         db.session.commit()
-        # USUNIĘTO WYSYŁANIE E-MAILA
         flash("Potwierdzono odbiór zadania.", "info")
     else:
         flash("Nie możesz wykonać tej akcji.", "warning")
@@ -140,7 +139,6 @@ def complete_task(id):
     if current_user in task.assignees and task.status == 'Przyjęte':
         task.status = 'Zakończone'
         db.session.commit()
-        # USUNIĘTO WYSYŁANIE E-MAILA
         flash("Zadanie zostało oznaczone jako zakończone.", "success")
     else:
         flash("Nie możesz wykonać tej akcji.", "warning")
@@ -152,24 +150,3 @@ def complete_task(id):
 def download_file(filename):
     safe_path = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     return send_from_directory(safe_path, filename, as_attachment=True)
-    
-@bp.route('/<int:id>/remind', methods=['POST'])
-@login_required
-@permission_required('tasks')
-def remind_task(id):
-    task = Task.query.get_or_404(id)
-    # Sprawdzamy, czy obecny użytkownik jest zleceniodawcą lub adminem
-    if current_user.id == task.assigner_id or current_user.has_role('admin'):
-        try:
-            for assignee in task.assignees:
-                if assignee.email:
-                    msg = Message(f"Przypomnienie o zadaniu: {task.title}", recipients=[assignee.email])
-                    msg.body = f"Cześć {assignee.username},\n\nTo jest przypomnienie o zadaniu \"{task.title}\", które zostało Ci zlecone przez {task.assigner.username}.\n\nTermin realizacji: {task.due_date.strftime('%Y-%m-%d') if task.due_date else 'Brak'}\n\nProsimy o podjęcie działań."
-                    mail.send(msg)
-            flash("Przypomnienia e-mail zostały wysłane do pracowników.", "success")
-        except Exception as e:
-            flash(f"Nie udało się wysłać przypomnień. Błąd: {e}", "danger")
-    else:
-        flash("Nie masz uprawnień do wysyłania przypomnień dla tego zadania.", "danger")
-    
-    return redirect(url_for('tasks.task_details', id=id))

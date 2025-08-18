@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Archiwum Zadań{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Archiwum Zadań</h1>
+        <a href="{{ url_for('tasks.index') }}" class="btn btn-secondary">Powrót do pulpitu zadań</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Tytuł</th>
+                        <th>Dla</th>
+                        <th>Od</th>
+                        <th>Status</th>
+                        <th>Data</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.title }}</td>
+                        <td>
+                            {% for user in task.assignees %}
+                                <span class="badge bg-secondary">{{ user.username }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>{{ task.assigner.username }}</td>
+                        <td><span class="badge bg-success">{{ task.status }}</span></td>
+                        <td>{{ task.creation_date | localdatetime }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('tasks.task_details', id=task.id) }}" class="btn btn-primary btn-sm">Podgląd</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Archiwum jest puste.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

@@ -3,12 +3,15 @@
 
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Pulpit Zadań</h1>
-        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary">Utwórz nowe zadanie</a>
+        <h1>Pulpit Zadań Aktywnych</h1>
+        <div>
+            <a href="{{ url_for('tasks.archive') }}" class="btn btn-secondary">Archiwum Zadań</a>
+            <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary">Utwórz nowe zadanie</a>
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
     {% endwith %}
 
     <div class="row">
@@ -27,13 +30,17 @@
                             <div class="mt-2">
                                 {% if task.priority == 2 %}<span class="badge bg-warning text-dark">Wysoki</span>
                                 {% elif task.priority == 3 %}<span class="badge bg-danger">Krytyczny</span>{% endif %}
-                                <span class="badge {% if task.status == 'Nowe' %} bg-primary {% elif task.status == 'Przyjęte' %} bg-info text-dark {% elif task.status == 'Zakończone' %} bg-success {% endif %}">{{ task.status }}</span>
+                                <span class="badge 
+                                    {% if task.status == 'Nowe' %} bg-primary
+                                    {% elif task.status == 'Przyjęte' %} bg-info text-dark
+                                    {% endif %}
+                                ">{{ task.status }}</span>
                                 {% if task.due_date %}<span class="badge bg-secondary">Termin: {{ task.due_date.strftime('%Y-%m-%d') }} ({{ task.due_date | dayofweek }})</span>{% endif %}
                             </div>
                             <small>Od: {{ task.assigner.username }}</small>
                         </a>
                         {% else %}
-                        <div class="list-group-item">Brak zadań przypisanych do Ciebie.</div>
+                        <div class="list-group-item">Brak aktywnych zadań przypisanych do Ciebie.</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -55,15 +62,19 @@
                             <div class="mt-2">
                                 {% if task.priority == 2 %}<span class="badge bg-warning text-dark">Wysoki</span>
                                 {% elif task.priority == 3 %}<span class="badge bg-danger">Krytyczny</span>{% endif %}
-                                <span class="badge {% if task.status == 'Nowe' %} bg-primary {% elif task.status == 'Przyjęte' %} bg-info text-dark {% elif task.status == 'Zakończone' %} bg-success {% endif %}">{{ task.status }}</span>
+                                <span class="badge 
+                                    {% if task.status == 'Nowe' %} bg-primary
+                                    {% elif task.status == 'Przyjęte' %} bg-info text-dark
+                                    {% endif %}
+                                ">{{ task.status }}</span>
                                 {% if task.due_date %}<span class="badge bg-secondary">Termin: {{ task.due_date.strftime('%Y-%m-%d') }} ({{ task.due_date | dayofweek }})</span>{% endif %}
                             </div>
                             <small>Dla: {% for user in task.assignees %}{{ user.username }}{% if not loop.last %}, {% endif %}{% endfor %}</small>
                         </a>
                         {% else %}
-                        <div class="list-group-item">Nie utworzyłeś jeszcze żadnych zadań.</div>
+                        <div class="list-group-item">Nie utworzyłeś jeszcze żadnych aktywnych zadań.</div>
                         {% endfor %}
-                    </div>
+                    </ul>
                 </div>
             </div>
         </div>

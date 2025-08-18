@@ -24,7 +24,11 @@
                     {% for task in tasks %}
                     <tr>
                         <td>{{ task.title }}</td>
-                        <td>{{ task.assignee.username }}</td>
+                        <td>
+                            {% for user in task.assignees %}
+                                <span class="badge bg-secondary">{{ user.username }}</span>
+                            {% endfor %}
+                            </td>
                         <td>{{ task.assigner.username }}</td>
                         <td>
                             <span class="badge 
