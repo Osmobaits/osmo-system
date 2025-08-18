@@ -30,11 +30,7 @@
                             <div class="mt-2">
                                 {% if task.priority == 2 %}<span class="badge bg-warning text-dark">Wysoki</span>
                                 {% elif task.priority == 3 %}<span class="badge bg-danger">Krytyczny</span>{% endif %}
-                                <span class="badge 
-                                    {% if task.status == 'Nowe' %} bg-primary
-                                    {% elif task.status == 'Przyjęte' %} bg-info text-dark
-                                    {% endif %}
-                                ">{{ task.status }}</span>
+                                <span class="badge {% if task.status == 'Nowe' %} bg-primary {% elif task.status == 'Przyjęte' %} bg-info text-dark {% endif %}">{{ task.status }}</span>
                                 {% if task.due_date %}<span class="badge bg-secondary">Termin: {{ task.due_date.strftime('%Y-%m-%d') }} ({{ task.due_date | dayofweek }})</span>{% endif %}
                             </div>
                             <small>Od: {{ task.assigner.username }}</small>
@@ -62,11 +58,7 @@
                             <div class="mt-2">
                                 {% if task.priority == 2 %}<span class="badge bg-warning text-dark">Wysoki</span>
                                 {% elif task.priority == 3 %}<span class="badge bg-danger">Krytyczny</span>{% endif %}
-                                <span class="badge 
-                                    {% if task.status == 'Nowe' %} bg-primary
-                                    {% elif task.status == 'Przyjęte' %} bg-info text-dark
-                                    {% endif %}
-                                ">{{ task.status }}</span>
+                                <span class="badge {% if task.status == 'Nowe' %} bg-primary {% elif task.status == 'Przyjęte' %} bg-info text-dark {% endif %}">{{ task.status }}</span>
                                 {% if task.due_date %}<span class="badge bg-secondary">Termin: {{ task.due_date.strftime('%Y-%m-%d') }} ({{ task.due_date | dayofweek }})</span>{% endif %}
                             </div>
                             <small>Dla: {% for user in task.assignees %}{{ user.username }}{% if not loop.last %}, {% endif %}{% endfor %}</small>

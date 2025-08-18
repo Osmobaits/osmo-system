@@ -27,28 +27,49 @@
             </div>
         </div>
         <div class="card-body">
-            </div>
+            <p><strong>Zlecone przez:</strong> {{ task.assigner.username }}</p>
+            <p><strong>Przypisane do:</strong> 
+                {% for user in task.assignees %}
+                    <span class="badge bg-secondary">{{ user.username }}</span>
+                {% endfor %}
+            </p>
+            <p><strong>Data utworzenia:</strong> {{ task.creation_date | localdatetime }}</p>
+            <p><strong>Priorytet:</strong> 
+                {% if task.priority == 1 %}Normalny
+                {% elif task.priority == 2 %}<span class="text-warning fw-bold">Wysoki</span>
+                {% else %}<span class="text-danger fw-bold">Krytyczny</span>
+                {% endif %}
+            </p>
+            <p><strong>Data realizacji:</strong> 
+                {% if task.due_date %}
+                    {{ task.due_date.strftime('%Y-%m-%d') }} ({{ task.due_date | dayofweek }})
+                {% else %}
+                    Brak
+                {% endif %}
+            </p>
+            <hr>
+            <h5>Treść zadania:</h5>
+            <p style="white-space: pre-wrap;">{{ task.description or 'Brak opisu.' }}</p>
 
-        <div class="card-footer d-flex justify-content-end">
-            {% if current_user in task.assignees %}
-                <div>
-                    {% if task.status == 'Nowe' %}
-                        <form method="POST" action="{{ url_for('tasks.accept_task', id=task.id) }}" class="d-inline-block">
-                            <button type="submit" class="btn btn-info">Potwierdź odbiór zadania</button>
-                        </form>
-                    {% elif task.status == 'Przyjęte' %}
-                        <form method="POST" action="{{ url_for('tasks.complete_task', id=task.id) }}" class="d-inline-block">
-                            <button type="submit" class="btn btn-success">Oznacz jako Zakończone</button>
-                        </form>
-                    {% endif %}
-                </div>
-            {% endif %}
-
-            {% if (current_user.id == task.assigner_id or current_user.has_role('admin')) and task.status != 'Zakończone' %}
-                <form method="POST" action="{{ url_for('tasks.remind_task', id=task.id) }}" class="ms-2">
-                    <button type="submit" class="btn btn-outline-primary">Wyślij przypomnienie</button>
-                </form>
+            {% if task.attachments %}
+                <hr>
+                <h5>Załączniki:</h5>
+                <ul class="list-group">
+                    {% for attachment in task.attachments %}
+                        <li class="list-group-item"><a href="{{ url_for('tasks.download_file', filename=attachment.filepath) }}" target="_blank">{{ attachment.filename }}</a></li>
+                    {% endfor %}
+                </ul>
             {% endif %}
         </div>
+
+        {% if current_user in task.assignees %}
+            <div class="card-footer text-end">
+                {% if task.status == 'Nowe' %}
+                    <form method="POST" action="{{ url_for('tasks.accept_task', id=task.id) }}" style="display:inline;"><button type="submit" class="btn btn-info">Potwierdź odbiór zadania</button></form>
+                {% elif task.status == 'Przyjęte' %}
+                    <form method="POST" action="{{ url_for('tasks.complete_task', id=task.id) }}" style="display:inline;"><button type="submit" class="btn btn-success">Oznacz jako Zakończone</button></form>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

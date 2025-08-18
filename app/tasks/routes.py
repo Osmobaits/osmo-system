@@ -34,12 +34,10 @@ def index():
 @login_required
 @permission_required('tasks')
 def archive():
-    # === POPRAWIONA LOGIKA PONIŻEJ ===
     completed_tasks = Task.query.filter(
         db.or_(Task.assignees.contains(current_user), Task.assigner_id == current_user.id),
         Task.status == 'Zakończone'
     ).order_by(Task.creation_date.desc()).all()
-    
     return render_template('tasks_archive.html', tasks=completed_tasks)
 
 @bp.route('/create', methods=['GET', 'POST'])
@@ -150,3 +148,24 @@ def complete_task(id):
 def download_file(filename):
     safe_path = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     return send_from_directory(safe_path, filename, as_attachment=True)
+
+# === PRZYWRÓCONA FUNKCJA: WYSYŁANIE PRZYPOMNIENIA ===
+@bp.route('/<int:id>/remind', methods=['POST'])
+@login_required
+@permission_required('tasks')
+def remind_task(id):
+    task = Task.query.get_or_404(id)
+    if current_user.id == task.assigner_id or current_user.has_role('admin'):
+        try:
+            for assignee in task.assignees:
+                if assignee.email:
+                    msg = Message(f"Przypomnienie o zadaniu: {task.title}", recipients=[assignee.email])
+                    msg.body = f"Cześć {assignee.username},\n\nTo jest przypomnienie o zadaniu \"{task.title}\", które zostało Ci zlecone przez {task.assigner.username}.\n\nTermin realizacji: {task.due_date.strftime('%Y-%m-%d') if task.due_date else 'Brak'}\n\nProsimy o podjęcie działań."
+                    mail.send(msg)
+            flash("Przypomnienia e-mail zostały wysłane do pracowników.", "success")
+        except Exception as e:
+            flash(f"Nie udało się wysłać przypomnień. Błąd: {e}", "danger")
+    else:
+        flash("Nie masz uprawnień do wysyłania przypomnień dla tego zadania.", "danger")
+    
+    return redirect(url_for('tasks.task_details', id=id))
