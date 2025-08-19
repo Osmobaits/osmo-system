@@ -91,26 +91,25 @@ def all_tasks():
     return render_template('all_tasks.html', tasks=tasks)
 
 
-# === NOWA FUNKCJA: STATYSTYKI PRODUKCJI ===
 @bp.route('/statistics')
 @login_required
 @permission_required('admin')
 def statistics():
     # Statystyki dzienne
     daily_stats = db.session.query(
-        cast(ProductionOrder.order_date, Date).label('date'),
+        func.date(ProductionOrder.order_date).label('date'), # Zamiast cast, używamy func.date
         FinishedProduct.name.label('product_name'),
         func.sum(ProductionOrder.quantity_produced).label('total_quantity')
-    ).join(FinishedProduct).group_by('date', 'product_name').order_by(db.desc('date')).all()
+    ).join(FinishedProduct).group_by(func.date(ProductionOrder.order_date), FinishedProduct.name).order_by(db.desc('date')).all()
 
-    # Statystyki tygodniowe
+    # Statystyki tygodniowe (bez zmian, ten format działa)
     weekly_stats = db.session.query(
         func.strftime('%Y-%W', ProductionOrder.order_date).label('week'),
         FinishedProduct.name.label('product_name'),
         func.sum(ProductionOrder.quantity_produced).label('total_quantity')
     ).join(FinishedProduct).group_by('week', 'product_name').order_by(db.desc('week')).all()
     
-    # Statystyki miesięczne
+    # Statystyki miesięczne (bez zmian, ten format działa)
     monthly_stats = db.session.query(
         func.strftime('%Y-%m', ProductionOrder.order_date).label('month'),
         FinishedProduct.name.label('product_name'),
