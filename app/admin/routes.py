@@ -4,7 +4,7 @@ from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct
 from flask_login import login_required, current_user
 from app.decorators import permission_required
 from app.auth.routes import bcrypt
-from sqlalchemy import func, cast, Date
+from sqlalchemy import func
 from datetime import datetime, timedelta
 
 bp = Blueprint('admin', __name__, template_folder='templates', url_prefix='/admin')
@@ -90,28 +90,41 @@ def all_tasks():
     tasks = Task.query.order_by(Task.creation_date.desc()).all()
     return render_template('all_tasks.html', tasks=tasks)
 
-
 @bp.route('/statistics')
 @login_required
 @permission_required('admin')
 def statistics():
+    # Sprawdzamy, jakiego dialektu bazy danych używamy
+    db_dialect = db.engine.dialect.name
+
+    if db_dialect == 'postgresql':
+        # Wersja dla PostgreSQL (produkcja)
+        date_func_daily = func.to_char(ProductionOrder.order_date, 'YYYY-MM-DD')
+        date_func_weekly = func.to_char(ProductionOrder.order_date, 'YYYY-WW')
+        date_func_monthly = func.to_char(ProductionOrder.order_date, 'YYYY-MM')
+    else:
+        # Wersja dla SQLite (lokalnie)
+        date_func_daily = func.date(ProductionOrder.order_date)
+        date_func_weekly = func.strftime('%Y-%W', ProductionOrder.order_date)
+        date_func_monthly = func.strftime('%Y-%m', ProductionOrder.order_date)
+
     # Statystyki dzienne
     daily_stats = db.session.query(
-        func.date(ProductionOrder.order_date).label('date'), # Zamiast cast, używamy func.date
+        date_func_daily.label('date'),
         FinishedProduct.name.label('product_name'),
         func.sum(ProductionOrder.quantity_produced).label('total_quantity')
-    ).join(FinishedProduct).group_by(func.date(ProductionOrder.order_date), FinishedProduct.name).order_by(db.desc('date')).all()
+    ).join(FinishedProduct).group_by('date', 'product_name').order_by(db.desc('date')).all()
 
-    # Statystyki tygodniowe (bez zmian, ten format działa)
+    # Statystyki tygodniowe
     weekly_stats = db.session.query(
-        func.strftime('%Y-%W', ProductionOrder.order_date).label('week'),
+        date_func_weekly.label('week'),
         FinishedProduct.name.label('product_name'),
         func.sum(ProductionOrder.quantity_produced).label('total_quantity')
     ).join(FinishedProduct).group_by('week', 'product_name').order_by(db.desc('week')).all()
     
-    # Statystyki miesięczne (bez zmian, ten format działa)
+    # Statystyki miesięczne
     monthly_stats = db.session.query(
-        func.strftime('%Y-%m', ProductionOrder.order_date).label('month'),
+        date_func_monthly.label('month'),
         FinishedProduct.name.label('product_name'),
         func.sum(ProductionOrder.quantity_produced).label('total_quantity')
     ).join(FinishedProduct).group_by('month', 'product_name').order_by(db.desc('month')).all()
