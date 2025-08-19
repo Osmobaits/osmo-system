@@ -94,6 +94,10 @@ class ProductionOrder(db.Model):
     quantity_produced = db.Column(db.Integer, nullable=False)
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     finished_product = db.relationship('FinishedProduct', back_populates='production_orders')
+    
+    @property
+    def production_date(self):
+        return self.order_date.date()
 
 class Client(db.Model):
     __tablename__ = 'clients'

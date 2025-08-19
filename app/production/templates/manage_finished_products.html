@@ -18,7 +18,7 @@
         <div class="card-header"><h3>Historia Produkcji (Partie)</h3></div>
         <div class="card-body">
             {% if production_history %}
-                {% for group in production_history | groupby('order_date.date') %}
+                {% for group in production_history | groupby('production_date') %}
                     <div class="mb-4">
                         <h4 class="border-bottom pb-2 mb-3">
                             {{ group.grouper.strftime('%Y-%m-%d') }} ({{ group.grouper | dayofweek }})
@@ -50,7 +50,7 @@
                         </table>
                     </div>
                 {% endfor %}
-                {% else %}
+            {% else %}
                 <p class="text-center">Brak historii produkcji.</p>
             {% endif %}
         </div>
