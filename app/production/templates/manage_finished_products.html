@@ -17,35 +17,42 @@
     <div class="card shadow-sm">
         <div class="card-header"><h3>Historia Produkcji (Partie)</h3></div>
         <div class="card-body">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Data Produkcji</th>
-                        <th>Nazwa Produktu</th>
-                        <th>Wyprodukowana Ilość</th>
-                        <th class="text-end">Akcje</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for batch in production_history %}
-                    <tr>
-                        <td>{{ batch.order_date | localdatetime }}</td>
-                        <td>{{ batch.finished_product.name }}</td>
-                        <td>{{ batch.quantity_produced }}</td>
-                        <td class="text-end">
-                            <a href="{{ url_for('production.edit_batch', order_id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
-                            <form method="POST" action="{{ url_for('production.delete_batch', order_id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć ten wpis z historii produkcji?');">
-                                <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="text-center">Brak historii produkcji.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% if production_history %}
+                {% for group in production_history | groupby('order_date.date') %}
+                    <div class="mb-4">
+                        <h4 class="border-bottom pb-2 mb-3">
+                            {{ group.grouper.strftime('%Y-%m-%d') }} ({{ group.grouper | dayofweek }})
+                        </h4>
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Produkt</th>
+                                    <th>Ilość</th>
+                                    <th>Godzina</th>
+                                    <th class="text-end">Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for batch in group.list %}
+                                <tr>
+                                    <td>{{ batch.finished_product.name }}</td>
+                                    <td>{{ batch.quantity_produced }}</td>
+                                    <td>{{ batch.order_date | localdatetime }}</td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('production.edit_batch', order_id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
+                                        <form method="POST" action="{{ url_for('production.delete_batch', order_id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć ten wpis z historii produkcji?');">
+                                            <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-center">Brak historii produkcji.</p>
+            {% endif %}
         </div>
     </div>
 {% endblock %}

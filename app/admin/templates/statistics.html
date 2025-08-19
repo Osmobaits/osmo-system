@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Statystyki Produkcji{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Statystyki Produkcji</h1>
+        <a href="{{ url_for('admin.manage_users') }}" class="btn btn-secondary">Powrót do panelu admina</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header"><h3>Podsumowanie Miesięczne</h3></div>
+        <div class="card-body">
+            <table class="table table-sm table-striped">
+                <thead><tr><th>Miesiąc</th><th>Produkt</th><th>Łączna produkcja</th></tr></thead>
+                <tbody>
+                    {% for stat in monthly_stats %}
+                    <tr>
+                        <td>{{ stat.month }}</td>
+                        <td>{{ stat.product_name }}</td>
+                        <td>{{ stat.total_quantity }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-center">Brak danych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header"><h3>Podsumowanie Tygodniowe</h3></div>
+        <div class="card-body">
+            <table class="table table-sm table-striped">
+                <thead><tr><th>Tydzień Roku</th><th>Produkt</th><th>Łączna produkcja</th></tr></thead>
+                <tbody>
+                    {% for stat in weekly_stats %}
+                    <tr>
+                        <td>{{ stat.week }}</td>
+                        <td>{{ stat.product_name }}</td>
+                        <td>{{ stat.total_quantity }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-center">Brak danych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-header"><h3>Podsumowanie Dzienne</h3></div>
+        <div class="card-body">
+            <table class="table table-sm table-striped">
+                <thead><tr><th>Data</th><th>Produkt</th><th>Łączna produkcja</th></tr></thead>
+                <tbody>
+                    {% for stat in daily_stats %}
+                    <tr>
+                        <td>{{ stat.date.strftime('%Y-%m-%d') }} ({{ stat.date | dayofweek }})</td>
+                        <td>{{ stat.product_name }}</td>
+                        <td>{{ stat.total_quantity }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-center">Brak danych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

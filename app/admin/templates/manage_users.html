@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Zarządzaj Użytkownikami{% endblock %}
+{% block title %}Panel Administratora{% endblock %}
 
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Panel Administratora - Zarządzanie Użytkownikami</h1>
-        <a href="{{ url_for('admin.all_tasks') }}" class="btn btn-info">Zobacz wszystkie zadania</a>
+        <h1>Panel Administratora</h1>
+        <div>
+            <a href="{{ url_for('admin.all_tasks') }}" class="btn btn-info">Zobacz wszystkie zadania</a>
+            <a href="{{ url_for('admin.statistics') }}" class="btn btn-primary">Statystyki Produkcji</a>
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
