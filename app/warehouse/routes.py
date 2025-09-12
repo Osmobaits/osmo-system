@@ -1,8 +1,10 @@
 # app/warehouse/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, RawMaterial, Category
+from app.models import db, RawMaterial, Category, RawMaterialBatch
 from flask_login import login_required
 from app.decorators import permission_required
+from datetime import date
+from sqlalchemy.orm import joinedload
 
 bp = Blueprint('warehouse', __name__, template_folder='templates', url_prefix='/warehouse')
 
@@ -30,9 +32,9 @@ def index():
             flash("Wszystkie pola są wymagane.", "warning")
         return redirect(url_for('warehouse.index'))
 
-    all_raw_materials = RawMaterial.query.order_by(RawMaterial.name).all()
+    categories = Category.query.options(joinedload(Category.raw_materials)).order_by(Category.name).all()
     all_batches = RawMaterialBatch.query.order_by(RawMaterialBatch.received_date.desc()).all()
-    return render_template('warehouse_index.html', raw_materials=all_raw_materials, batches=all_batches)
+    return render_template('warehouse_index.html', categories=categories, batches=all_batches)
 
 @bp.route('/catalogue', methods=['GET', 'POST'])
 @login_required
@@ -41,12 +43,21 @@ def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
         category_id = request.form.get('category_id')
+
+        # === POCZĄTEK ZMIANY: SPRAWDZENIE CZY NAZWA ISTNIEJE ===
         if name and category_id:
-            new_material = RawMaterial(name=name, category_id=int(category_id))
-            db.session.add(new_material)
-            db.session.commit()
-            flash(f"Dodano surowiec '{name}' do katalogu.", "success")
+            existing_material = RawMaterial.query.filter_by(name=name).first()
+            if existing_material:
+                flash(f"Surowiec o nazwie '{name}' już istnieje w katalogu. Proszę podać inną nazwę.", "warning")
+            else:
+                new_material = RawMaterial(name=name, category_id=int(category_id))
+                db.session.add(new_material)
+                db.session.commit()
+                flash(f"Dodano surowiec '{name}' do katalogu.", "success")
+        # === KONIEC ZMIANY ===
+        
         return redirect(url_for('warehouse.manage_catalogue'))
+    
     materials = RawMaterial.query.order_by(RawMaterial.name).all()
     categories = Category.query.order_by(Category.name).all()
     return render_template('manage_raw_materials_catalogue.html', materials=materials, categories=categories)
@@ -58,12 +69,10 @@ def edit_material(id):
     material_to_edit = RawMaterial.query.get_or_404(id)
     if request.method == 'POST':
         material_to_edit.name = request.form.get('name')
-        material_to_edit.quantity_in_stock = float(request.form.get('quantity'))
-        material_to_edit.unit = request.form.get('unit')
         material_to_edit.category_id = int(request.form.get('category_id'))
         db.session.commit()
         flash(f"Zaktualizowano surowiec: {material_to_edit.name}", "success")
-        return redirect(url_for('warehouse.index'))
+        return redirect(url_for('warehouse.manage_catalogue'))
     all_categories = Category.query.order_by(Category.name).all()
     return render_template('edit_material.html', material=material_to_edit, categories=all_categories)
 
@@ -75,7 +84,7 @@ def delete_material(id):
     db.session.delete(material_to_delete)
     db.session.commit()
     flash(f"Usunięto surowiec: {material_to_delete.name}", "danger")
-    return redirect(url_for('warehouse.index'))
+    return redirect(url_for('warehouse.manage_catalogue'))
 
 @bp.route('/categories', methods=['GET', 'POST'])
 @login_required

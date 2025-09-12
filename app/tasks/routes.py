@@ -54,6 +54,7 @@ def create_task():
         if not title or not assignee_ids:
             flash("Tytuł i przynajmniej jeden pracownik są wymagane.", "warning")
             return redirect(url_for('tasks.create_task'))
+        
         due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
         new_task = Task(
             title=title, description=description, assigner_id=current_user.id,
@@ -62,6 +63,7 @@ def create_task():
         assignees = User.query.filter(User.id.in_(assignee_ids)).all()
         new_task.assignees.extend(assignees)
         db.session.add(new_task)
+        
         for file in files:
             if file and file.filename != '':
                 filename = secure_filename(file.filename)
@@ -70,6 +72,7 @@ def create_task():
                 attachment = TaskAttachment(task=new_task, filename=filename, filepath=filename)
                 db.session.add(attachment)
         db.session.commit()
+
         try:
             for assignee in assignees:
                 if assignee.email:
@@ -80,6 +83,7 @@ def create_task():
         except Exception as e:
             flash(f"Zadanie utworzono, ale wystąpił błąd przy wysyłce e-maili: {e}", "danger")
         return redirect(url_for('tasks.index'))
+
     users = User.query.order_by(User.username).all()
     return render_template('create_task.html', users=users)
 
@@ -149,7 +153,6 @@ def download_file(filename):
     safe_path = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     return send_from_directory(safe_path, filename, as_attachment=True)
 
-# === PRZYWRÓCONA FUNKCJA: WYSYŁANIE PRZYPOMNIENIA ===
 @bp.route('/<int:id>/remind', methods=['POST'])
 @login_required
 @permission_required('tasks')
@@ -167,5 +170,4 @@ def remind_task(id):
             flash(f"Nie udało się wysłać przypomnień. Błąd: {e}", "danger")
     else:
         flash("Nie masz uprawnień do wysyłania przypomnień dla tego zadania.", "danger")
-    
     return redirect(url_for('tasks.task_details', id=id))

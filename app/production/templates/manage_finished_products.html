@@ -35,7 +35,14 @@
                             <tbody>
                                 {% for batch in group.list %}
                                 <tr>
-                                    <td>{{ batch.finished_product.name }}</td>
+                                    <td>
+                                        {{ batch.finished_product.name }}
+                                        {# === POCZĄTEK ZMIANY === #}
+                                        {% if batch.sample_required %}
+                                            <span class="badge bg-danger ms-2">Wymagana próbka</span>
+                                        {% endif %}
+                                        {# === KONIEC ZMIANY === #}
+                                    </td>
                                     <td>{{ batch.quantity_produced }}</td>
                                     <td>{{ batch.order_date | localdatetime }}</td>
                                     <td class="text-end">

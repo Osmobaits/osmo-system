@@ -1,8 +1,8 @@
-"""Utworzenie kompletnej historii migracji
+"""Add sample_required to ProductionOrder
 
-Revision ID: e48b8f8d0445
+Revision ID: 641c0216a3bd
 Revises: 
-Create Date: 2025-09-12 10:26:42.353047
+Create Date: 2025-09-12 13:03:53.872594
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e48b8f8d0445'
+revision = '641c0216a3bd'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -74,6 +74,7 @@ def upgrade():
     sa.Column('finished_product_id', sa.Integer(), nullable=False),
     sa.Column('quantity_produced', sa.Integer(), nullable=False),
     sa.Column('order_date', sa.DateTime(), nullable=False),
+    sa.Column('sample_required', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

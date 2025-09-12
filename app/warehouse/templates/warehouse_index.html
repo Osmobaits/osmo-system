@@ -21,12 +21,18 @@
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Surowiec</label>
+                        {# === POCZĄTEK ZMIANY: POGRUPOWANE MENU === #}
                         <select name="raw_material_id" class="form-select" required>
                             <option value="">Wybierz z katalogu...</option>
-                            {% for material in raw_materials %}
-                                <option value="{{ material.id }}">{{ material.name }}</option>
+                            {% for category in categories %}
+                                <optgroup label="{{ category.name }}">
+                                    {% for material in category.raw_materials %}
+                                        <option value="{{ material.id }}">{{ material.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
                             {% endfor %}
                         </select>
+                        {# === KONIEC ZMIANY: POGRUPOWANE MENU === #}
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Numer Partii</label>
@@ -60,21 +66,28 @@
                         <th>Jednostka</th>
                     </tr>
                 </thead>
+                {# === POCZĄTEK ZMIANY: POGRUPOWANA TABELA === #}
                 <tbody>
-                    {% for batch in batches %}
-                    <tr>
-                        <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
-                        <td>{{ batch.material.name }}</td>
-                        <td>{{ batch.batch_number }}</td>
-                        <td>{{ batch.quantity_on_hand }}</td>
-                        <td>{{ batch.unit }}</td>
-                    </tr>
+                    {% for group in batches | groupby('material.category.name') %}
+                        <tr class="table-light">
+                            <td colspan="5" class="fw-bold ps-2">{{ group.grouper }}</td>
+                        </tr>
+                        {% for batch in group.list %}
+                        <tr>
+                            <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
+                            <td>{{ batch.material.name }}</td>
+                            <td>{{ batch.batch_number }}</td>
+                            <td>{{ batch.quantity_on_hand }}</td>
+                            <td>{{ batch.unit }}</td>
+                        </tr>
+                        {% endfor %}
                     {% else %}
                     <tr>
                         <td colspan="5" class="text-center">Brak partii w magazynie.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
+                {# === KONIEC ZMIANY: POGRUPOWANA TABELA === #}
             </table>
         </div>
     </div>

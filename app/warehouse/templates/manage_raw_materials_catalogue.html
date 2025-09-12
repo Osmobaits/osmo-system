@@ -13,7 +13,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm mb-3">
                 <div class="card-header"><h3>Dodaj nowy surowiec do katalogu</h3></div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('warehouse.manage_catalogue') }}">
@@ -39,13 +39,26 @@
             <div class="card shadow-sm">
                 <div class="card-header"><h3>Istniejące surowce w katalogu</h3></div>
                 <div class="card-body">
+                    {# === POCZĄTEK ZMIANY: INTERAKTYWNA LISTA === #}
                     <ul class="list-group">
                         {% for material in materials %}
-                        <li class="list-group-item">{{ material.name }} (Kategoria: {{ material.category.name }})</li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold">{{ material.name }}</span>
+                                <small class="text-muted d-block">Kategoria: {{ material.category.name }}</small>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('warehouse.edit_material', id=material.id) }}" class="btn btn-info btn-sm">Edytuj</a>
+                                <form method="POST" action="{{ url_for('warehouse.delete_material', id=material.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz trwale usunąć ten surowiec z katalogu?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                </form>
+                            </div>
+                        </li>
                         {% else %}
                         <li class="list-group-item">Katalog jest pusty. Zdefiniuj pierwszy surowiec.</li>
                         {% endfor %}
                     </ul>
+                    {# === KONIEC ZMIANY === #}
                 </div>
             </div>
         </div>
