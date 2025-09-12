@@ -1,6 +1,6 @@
 # app/models.py
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, date
 from flask_login import UserMixin
 
 db = SQLAlchemy()
@@ -34,7 +34,7 @@ class User(db.Model, UserMixin):
                                      backref=db.backref('assignees', lazy=True))
 
     def has_role(self, role_name):
-        return any(role.name == role_name for role in self.roles)
+        return any(role.name == role.name for role in self.roles)
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -60,15 +60,23 @@ class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    raw_materials = db.relationship('RawMaterial', backref='category', lazy=True, cascade="all, delete-orphan")
+    raw_materials = db.relationship('RawMaterial', backref='category', lazy=True)
 
 class RawMaterial(db.Model):
     __tablename__ = 'raw_materials'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), unique=True, nullable=False)
-    quantity_in_stock = db.Column(db.Float, nullable=False, default=0.0)
-    unit = db.Column(db.String(20), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    batches = db.relationship('RawMaterialBatch', backref='material', lazy=True, cascade="all, delete-orphan")
+
+class RawMaterialBatch(db.Model):
+    __tablename__ = 'raw_material_batches'
+    id = db.Column(db.Integer, primary_key=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    batch_number = db.Column(db.String(100), nullable=False)
+    quantity_on_hand = db.Column(db.Float, nullable=False, default=0.0)
+    unit = db.Column(db.String(20), nullable=False)
+    received_date = db.Column(db.Date, nullable=False, default=date.today)
 
 class FinishedProduct(db.Model):
     __tablename__ = 'finished_products'
@@ -94,7 +102,6 @@ class ProductionOrder(db.Model):
     quantity_produced = db.Column(db.Integer, nullable=False)
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     finished_product = db.relationship('FinishedProduct', back_populates='production_orders')
-    
     @property
     def production_date(self):
         return self.order_date.date()

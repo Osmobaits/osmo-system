@@ -11,24 +11,45 @@ bp = Blueprint('warehouse', __name__, template_folder='templates', url_prefix='/
 @permission_required('warehouse')
 def index():
     if request.method == 'POST':
-        name = request.form.get('name')
+        raw_material_id = request.form.get('raw_material_id')
+        batch_number = request.form.get('batch_number')
         quantity = request.form.get('quantity')
         unit = request.form.get('unit')
+        if raw_material_id and batch_number and quantity and unit:
+            new_batch = RawMaterialBatch(
+                raw_material_id=int(raw_material_id),
+                batch_number=batch_number,
+                quantity_on_hand=float(quantity),
+                unit=unit,
+                received_date=date.today()
+            )
+            db.session.add(new_batch)
+            db.session.commit()
+            flash(f"Dodano nową partię surowca.", "success")
+        else:
+            flash("Wszystkie pola są wymagane.", "warning")
+        return redirect(url_for('warehouse.index'))
+
+    all_raw_materials = RawMaterial.query.order_by(RawMaterial.name).all()
+    all_batches = RawMaterialBatch.query.order_by(RawMaterialBatch.received_date.desc()).all()
+    return render_template('warehouse_index.html', raw_materials=all_raw_materials, batches=all_batches)
+
+@bp.route('/catalogue', methods=['GET', 'POST'])
+@login_required
+@permission_required('warehouse')
+def manage_catalogue():
+    if request.method == 'POST':
+        name = request.form.get('name')
         category_id = request.form.get('category_id')
-        if name and quantity and unit and category_id:
-            existing_material = RawMaterial.query.filter_by(name=name).first()
-            if existing_material:
-                flash(f'Surowiec o nazwie "{name}" już istnieje w magazynie.', 'warning')
-            else:
-                new_material = RawMaterial(name=name, quantity_in_stock=float(quantity), unit=unit, category_id=int(category_id))
-                db.session.add(new_material)
-                db.session.commit()
-                flash(f"Dodano surowiec: {name}", "success")
-            return redirect(url_for('warehouse.index'))
-            
-    all_materials = RawMaterial.query.order_by(RawMaterial.name).all()
-    all_categories = Category.query.order_by(Category.name).all()
-    return render_template('warehouse_index.html', materials=all_materials, categories=all_categories)
+        if name and category_id:
+            new_material = RawMaterial(name=name, category_id=int(category_id))
+            db.session.add(new_material)
+            db.session.commit()
+            flash(f"Dodano surowiec '{name}' do katalogu.", "success")
+        return redirect(url_for('warehouse.manage_catalogue'))
+    materials = RawMaterial.query.order_by(RawMaterial.name).all()
+    categories = Category.query.order_by(Category.name).all()
+    return render_template('manage_raw_materials_catalogue.html', materials=materials, categories=categories)
 
 @bp.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required

@@ -5,14 +5,15 @@ from .models import db, User, Role
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
+from flask_migrate import Migrate # <-- NOWY IMPORT
 import click
 from datetime import timezone, timedelta
 
 login_manager = LoginManager()
 bcrypt = Bcrypt()
 mail = Mail()
+migrate = Migrate() # <-- NOWY OBIEKT
 
-# === FUNKCJE I FILTRY DO FORMATOWANIA DATY I CZASU ===
 def format_datetime_local(dt):
     if dt is None:
         return ""
@@ -21,7 +22,6 @@ def format_datetime_local(dt):
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(cest).strftime('%Y-%m-%d %H:%M')
 
-# NOWA FUNKCJA I FILTR
 def format_day_of_week(dt):
     if dt is None:
         return ""
@@ -34,20 +34,17 @@ def create_app():
     app.template_folder = 'templates'
     
     db.init_app(app)
+    migrate.init_app(app, db) # <-- INICJALIZACJA
     login_manager.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)
 
-    # Rejestracja naszych filtrów
     app.jinja_env.filters['localdatetime'] = format_datetime_local
-    app.jinja_env.filters['dayofweek'] = format_day_of_week # <-- REJESTRACJA NOWEGO FILTRA
+    app.jinja_env.filters['dayofweek'] = format_day_of_week
 
     login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Proszę się zalogować, aby uzyskać dostęp.'
-    login_manager.login_message_category = 'info'
-
+    
     with app.app_context():
-        # Rejestracja wszystkich blueprintów
         from .warehouse import routes as warehouse_routes
         app.register_blueprint(warehouse_routes.bp)
         from .production import routes as production_routes
