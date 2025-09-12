@@ -34,7 +34,8 @@ class User(db.Model, UserMixin):
                                      backref=db.backref('assignees', lazy=True))
 
     def has_role(self, role_name):
-        return any(role.name == role.name for role in self.roles)
+        # POPRAWIONA LOGIKA
+        return any(role.name == role_name for role in self.roles)
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -102,9 +103,19 @@ class ProductionOrder(db.Model):
     quantity_produced = db.Column(db.Integer, nullable=False)
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     finished_product = db.relationship('FinishedProduct', back_populates='production_orders')
+    consumption_log = db.relationship('ProductionLog', backref='production_order', lazy=True, cascade="all, delete-orphan")
     @property
     def production_date(self):
         return self.order_date.date()
+
+# === BRAKUJĄCY MODEL: DZIENNIK ZUŻYCIA SUROWCÓW ===
+class ProductionLog(db.Model):
+    __tablename__ = 'production_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'), nullable=False)
+    raw_material_batch_id = db.Column(db.Integer, db.ForeignKey('raw_material_batches.id'), nullable=False)
+    quantity_consumed = db.Column(db.Float, nullable=False)
+    batch = db.relationship('RawMaterialBatch', lazy=True)
 
 class Client(db.Model):
     __tablename__ = 'clients'
