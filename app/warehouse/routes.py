@@ -18,7 +18,7 @@ def index():
         quantity = request.form.get('quantity')
         unit = request.form.get('unit')
         if raw_material_id and batch_number and quantity and unit:
-           new_batch = RawMaterialBatch(
+          new_batch = RawMaterialBatch(
                 raw_material_id=int(raw_material_id),
                 batch_number=batch_number,
                 quantity_on_hand=float(quantity),
