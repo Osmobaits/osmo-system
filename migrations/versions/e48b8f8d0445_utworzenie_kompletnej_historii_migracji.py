@@ -1,8 +1,8 @@
-"""Ponowna inicjalizacja historii migracji
+"""Utworzenie kompletnej historii migracji
 
-Revision ID: b02570c926f6
+Revision ID: e48b8f8d0445
 Revises: 
-Create Date: 2025-09-12 10:22:55.815418
+Create Date: 2025-09-12 10:26:42.353047
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'b02570c926f6'
+revision = 'e48b8f8d0445'
 down_revision = None
 branch_labels = None
 depends_on = None
