@@ -2,7 +2,8 @@
 {% block title %}Magazyn Surowców - Partie{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {# Dodajemy identyfikator na górze strony, do którego będą prowadzić linki "powrót" #}
+    <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Magazyn Surowców - Zarządzanie Partiami</h1>
         <div>
             <a href="{{ url_for('warehouse.manage_catalogue') }}" class="btn btn-info">Zarządzaj Katalogiem Surowców</a>
@@ -21,7 +22,6 @@
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Surowiec</label>
-                        {# === POCZĄTEK ZMIANY: POGRUPOWANE MENU === #}
                         <select name="raw_material_id" class="form-select" required>
                             <option value="">Wybierz z katalogu...</option>
                             {% for category in categories %}
@@ -32,7 +32,6 @@
                                 </optgroup>
                             {% endfor %}
                         </select>
-                        {# === KONIEC ZMIANY: POGRUPOWANE MENU === #}
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Numer Partii</label>
@@ -53,42 +52,81 @@
             </form>
         </div>
     </div>
-    <div class="card shadow-sm">
-        <div class="card-header"><h3>Partie na stanie</h3></div>
+
+    {# === POCZĄTEK NOWEJ SEKCJI: NAWIGACJA DO KATEGORII === #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h3>Partie na stanie</h3>
+        </div>
         <div class="card-body">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Data Przyjęcia</th>
-                        <th>Surowiec</th>
-                        <th>Numer Partii</th>
-                        <th>Ilość na stanie</th>
-                        <th>Jednostka</th>
-                    </tr>
-                </thead>
-                {# === POCZĄTEK ZMIANY: POGRUPOWANA TABELA === #}
-                <tbody>
-                    {% for group in batches | groupby('material.category.name') %}
-                        <tr class="table-light">
-                            <td colspan="5" class="fw-bold ps-2">{{ group.grouper }}</td>
+            <strong>Szybka nawigacja:</strong>
+            {% for category in categories if category.raw_materials %}
+                {# Tworzymy linki-kotwice do odpowiednich sekcji na stronie #}
+                <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {# === KONIEC NOWEJ SEKCJI === #}
+
+
+    {# === POCZĄTEK ZMIANY: OSOBNE TABELE DLA KAŻDEJ KATEGORII === #}
+    {% for category in categories if category.raw_materials %}
+        {# Każda sekcja ma ID odpowiadające linkowi z nawigacji #}
+        <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h4>{{ category.name }}</h4>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data Przyjęcia</th>
+                            <th>Surowiec</th>
+                            <th>Numer Partii</th>
+                            <th>Ilość na stanie</th>
+                            <th>Jednostka</th>
+                            <th class="text-end">Akcje</th>
                         </tr>
-                        {% for batch in group.list %}
+                    </thead>
+                    <tbody>
+                        {# Filtrujemy partie, aby wybrać tylko te z obecnej kategorii #}
+                        {% set batches_in_category = batches | selectattr('material.category.name', 'equalto', category.name) | list %}
+                        {% for batch in batches_in_category %}
                         <tr>
                             <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
                             <td>{{ batch.material.name }}</td>
                             <td>{{ batch.batch_number }}</td>
                             <td>{{ batch.quantity_on_hand }}</td>
                             <td>{{ batch.unit }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('warehouse.edit_batch', id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
+                                <form method="POST" action="{{ url_for('warehouse.delete_batch', id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć tę partię?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">Brak partii w magazynie.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                {# === KONIEC ZMIANY: POGRUPOWANA TABELA === #}
-            </table>
+                        {% if not batches_in_category %}
+                        <tr>
+                            <td colspan="6" class="text-center">Brak partii w tej kategorii.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                {# === NOWA SEKCJA: LINK POWROTNY === #}
+                <div class="text-end mt-2">
+                    <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
+                </div>
+            </div>
         </div>
-    </div>
+    {% endfor %}
+
+    {% if not batches %}
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <p class="mb-0">Brak jakichkolwiek partii w magazynie.</p>
+            </div>
+        </div>
+    {% endif %}
+    {# === KONIEC ZMIANY === #}
 {% endblock %}

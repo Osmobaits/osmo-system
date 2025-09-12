@@ -1,9 +1,9 @@
 # app/warehouse/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, RawMaterial, Category, RawMaterialBatch
+from app.models import db, RawMaterial, Category, RawMaterialBatch, ProductionLog
 from flask_login import login_required
 from app.decorators import permission_required
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy.orm import joinedload
 
 bp = Blueprint('warehouse', __name__, template_folder='templates', url_prefix='/warehouse')
@@ -36,6 +36,44 @@ def index():
     all_batches = RawMaterialBatch.query.order_by(RawMaterialBatch.received_date.desc()).all()
     return render_template('warehouse_index.html', categories=categories, batches=all_batches)
 
+
+@bp.route('/batch/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@permission_required('warehouse')
+def edit_batch(id):
+    batch_to_edit = RawMaterialBatch.query.get_or_404(id)
+    if request.method == 'POST':
+        batch_to_edit.batch_number = request.form.get('batch_number')
+        batch_to_edit.quantity_on_hand = float(request.form.get('quantity_on_hand'))
+        batch_to_edit.unit = request.form.get('unit')
+        date_str = request.form.get('received_date')
+        if date_str:
+            batch_to_edit.received_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        db.session.commit()
+        flash(f"Zaktualizowano dane partii nr: {batch_to_edit.batch_number}", "success")
+        return redirect(url_for('warehouse.index'))
+    
+    # === POCZĄTEK ZMIANY ===
+    return render_template('edit_raw_material_batch.html', batch=batch_to_edit)
+    # === KONIEC ZMIANY ===
+
+@bp.route('/batch/delete/<int:id>', methods=['POST'])
+@login_required
+@permission_required('warehouse')
+def delete_batch(id):
+    batch_to_delete = RawMaterialBatch.query.get_or_404(id)
+    usage_in_log = ProductionLog.query.filter_by(raw_material_batch_id=id).first()
+    
+    if usage_in_log:
+        flash(f"Nie można usunąć partii '{batch_to_delete.batch_number}', ponieważ została już użyta w produkcji. Możesz edytować jej ilość, np. ustawiając ją na 0.", "danger")
+    else:
+        db.session.delete(batch_to_delete)
+        db.session.commit()
+        flash(f"Partia '{batch_to_delete.batch_number}' została usunięta.", "success")
+        
+    return redirect(url_for('warehouse.index'))
+
 @bp.route('/catalogue', methods=['GET', 'POST'])
 @login_required
 @permission_required('warehouse')
@@ -43,8 +81,6 @@ def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
         category_id = request.form.get('category_id')
-
-        # === POCZĄTEK ZMIANY: SPRAWDZENIE CZY NAZWA ISTNIEJE ===
         if name and category_id:
             existing_material = RawMaterial.query.filter_by(name=name).first()
             if existing_material:
@@ -54,8 +90,6 @@ def manage_catalogue():
                 db.session.add(new_material)
                 db.session.commit()
                 flash(f"Dodano surowiec '{name}' do katalogu.", "success")
-        # === KONIEC ZMIANY ===
-        
         return redirect(url_for('warehouse.manage_catalogue'))
     
     materials = RawMaterial.query.order_by(RawMaterial.name).all()
