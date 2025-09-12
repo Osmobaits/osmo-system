@@ -23,7 +23,7 @@
                         <h4 class="border-bottom pb-2 mb-3">
                             {{ group.grouper.strftime('%Y-%m-%d') }} ({{ group.grouper | dayofweek }})
                         </h4>
-                        <table class="table table-striped table-sm">
+                        <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>Produkt</th>
@@ -35,14 +35,16 @@
                             <tbody>
                                 {% for batch in group.list %}
                                 <tr>
+                                    {# === POCZĄTEK ZMIANY: DODANIE LINKU === #}
                                     <td>
-                                        {{ batch.finished_product.name }}
-                                        {# === POCZĄTEK ZMIANY === #}
+                                        <a href="{{ url_for('production.production_order_details', order_id=batch.id) }}" class="fw-bold">
+                                            {{ batch.finished_product.name }}
+                                        </a>
                                         {% if batch.sample_required %}
                                             <span class="badge bg-danger ms-2">Wymagana próbka</span>
                                         {% endif %}
-                                        {# === KONIEC ZMIANY === #}
                                     </td>
+                                    {# === KONIEC ZMIANY === #}
                                     <td>{{ batch.quantity_produced }}</td>
                                     <td>{{ batch.order_date | localdatetime }}</td>
                                     <td class="text-end">

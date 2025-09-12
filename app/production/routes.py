@@ -11,7 +11,6 @@ bp = Blueprint('production', __name__, template_folder='templates', url_prefix='
 @login_required
 @permission_required('production')
 def manage_products():
-    # Pobieramy historię i grupujemy ją w logice szablonu, więc tutaj tylko przekazujemy wszystko
     production_history = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('manage_finished_products.html', production_history=production_history)
 
@@ -110,9 +109,6 @@ def delete_recipe_component(id):
 @login_required
 @permission_required('production')
 def manage_production_orders():
-    # ==========================================================================================
-    # === POCZĄTEK NOWEJ, ZMODYFIKOWANEJ LOGIKI ===
-    # ==========================================================================================
     if request.method == 'POST':
         product_id = request.form.get('product_id')
         batch_size = request.form.get('batch_size', type=int)
@@ -126,7 +122,6 @@ def manage_production_orders():
             flash(f"Produkt '{product.name}' nie ma zdefiniowanej receptury. Produkcja niemożliwa.", "danger")
             return redirect(url_for('production.manage_production_orders'))
 
-        # --- KROK 1: Planowanie zużycia (Logika FIFO) ---
         consumption_plan = []
         can_produce = True
         total_produced_weight = 0.0
@@ -150,8 +145,7 @@ def manage_production_orders():
                 })
                 temp_required -= quantity_to_take
             
-            if temp_required > 0.001: # Mała tolerancja dla błędów zmiennoprzecinkowych
-                # Sprawdzenie jednostki do wyświetlenia
+            if temp_required > 0.001:
                 unit = ""
                 if available_batches:
                     unit = available_batches[0].unit
@@ -165,19 +159,17 @@ def manage_production_orders():
         if not can_produce:
             return redirect(url_for('production.manage_production_orders'))
 
-        # --- KROK 2: Sprawdzenie, czy wymagana jest próbka ---
         sample_needed = False
         last_order = ProductionOrder.query.filter_by(finished_product_id=product.id).order_by(ProductionOrder.order_date.desc()).first()
         
         if not last_order:
-            sample_needed = True # Pierwsza produkcja tego produktu w historii
+            sample_needed = True
         else:
             previous_batches_ids = {log.raw_material_batch_id for log in last_order.consumption_log}
             current_batches_ids = {plan['batch_id'] for plan in consumption_plan}
             if previous_batches_ids != current_batches_ids:
                 sample_needed = True
 
-        # --- KROK 3: Wykonanie produkcji i zapis do bazy ---
         if product.packaging_weight_kg > 0:
             final_packaged_quantity = math.floor(total_produced_weight / product.packaging_weight_kg)
         else:
@@ -188,16 +180,14 @@ def manage_production_orders():
             return redirect(url_for('production.manage_production_orders'))
 
         try:
-            # Tworzenie zlecenia produkcyjnego z flagą 'sample_required'
             new_order = ProductionOrder(
                 finished_product_id=product.id,
                 quantity_produced=final_packaged_quantity,
                 sample_required=sample_needed
             )
             db.session.add(new_order)
-            db.session.flush() # Potrzebne, aby uzyskać new_order.id dla ProductionLog
+            db.session.flush()
 
-            # Aktualizacja stanów magazynowych i tworzenie logów
             for plan_item in consumption_plan:
                 batch_to_update = RawMaterialBatch.query.get(plan_item['batch_id'])
                 batch_to_update.quantity_on_hand -= plan_item['consumed_quantity']
@@ -209,7 +199,6 @@ def manage_production_orders():
                 )
                 db.session.add(log_entry)
             
-            # Aktualizacja stanu produktu gotowego
             product.quantity_in_stock += final_packaged_quantity
             
             db.session.commit()
@@ -219,9 +208,6 @@ def manage_production_orders():
             flash(f"Wystąpił błąd podczas produkcji: {e}", "danger")
             
         return redirect(url_for('production.manage_production_orders'))
-    # ==========================================================================================
-    # === KONIEC NOWEJ, ZMODYFIKOWANEJ LOGIKI ===
-    # ==========================================================================================
 
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).limit(20).all()
@@ -234,8 +220,6 @@ def manage_production_orders():
 def edit_batch(order_id):
     batch = ProductionOrder.query.get_or_404(order_id)
     if request.method == 'POST':
-        # Ta funkcja może wymagać przemyślenia w kontekście automatycznej zmiany stanów magazynowych
-        # Na razie pozwala tylko na edycję ilości w historii
         batch.quantity_produced = request.form.get('quantity', type=int)
         db.session.commit()
         flash("Zaktualizowano ilość w partii produkcyjnej.", "success")
@@ -247,10 +231,23 @@ def edit_batch(order_id):
 @login_required
 @permission_required('production')
 def delete_batch(order_id):
-    # UWAGA: Ta funkcja usuwa tylko wpis w historii. Nie cofa zmian w stanach magazynowych.
-    # Wymagałoby to bardziej zaawansowanej logiki.
     batch = ProductionOrder.query.get_or_404(order_id)
     db.session.delete(batch)
     db.session.commit()
     flash("Usunięto wpis z historii produkcji.", "danger")
     return redirect(url_for('production.manage_products'))
+
+# === POCZĄTEK NOWEJ FUNKCJI ===
+@bp.route('/order/<int:order_id>')
+@login_required
+@permission_required('production')
+def production_order_details(order_id):
+    order = ProductionOrder.query.get_or_404(order_id)
+    # Używamy .options(joinedload(...)) dla optymalizacji, aby uniknąć wielu zapytań do bazy w pętli
+    from sqlalchemy.orm import joinedload
+    consumption_logs = ProductionLog.query.options(
+        joinedload(ProductionLog.batch).joinedload(RawMaterialBatch.material)
+    ).filter_by(production_order_id=order_id).all()
+    
+    return render_template('production_order_details.html', order=order, logs=consumption_logs)
+# === KONIEC NOWEJ FUNKCJI ===

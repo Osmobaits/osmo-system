@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Szczegóły Partii Produkcyjnej{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Szczegóły Partii Produkcyjnej #{{ order.id }}</h1>
+        <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Powrót do Historii Produkcji</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h3>{{ order.finished_product.name }}</h3>
+                    <p class="text-muted mb-1">Data produkcji: {{ order.order_date | localdatetime }}</p>
+                    <p class="text-muted">Wyprodukowana ilość: {{ order.quantity_produced }} opakowań</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    {% if order.sample_required %}
+                        <div class="alert alert-danger d-inline-block">
+                            <strong>Uwaga!</strong> Z tej partii należy pobrać próbkę do archiwum.
+                        </div>
+                    {% else %}
+                         <div class="alert alert-success d-inline-block">
+                            Próbka dla tej partii nie jest wymagana.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h4>Zużyte surowce i numery partii</h4>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Nazwa Surowca</th>
+                        <th>Numer Partii</th>
+                        <th>Zużyta Ilość</th>
+                        <th>Jednostka</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.batch.material.name }}</td>
+                        <td>{{ log.batch.batch_number }}</td>
+                        <td>{{ "%.3f"|format(log.quantity_consumed) }}</td>
+                        <td>{{ log.batch.unit }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">Brak danych o zużytych surowcach.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
