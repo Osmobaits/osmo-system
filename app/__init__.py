@@ -5,14 +5,15 @@ from .models import db, User, Role
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
-from flask_migrate import Migrate # <-- NOWY IMPORT
+from flask_migrate import Migrate
 import click
 from datetime import timezone, timedelta
+from werkzeug.middleware.proxy_fix import ProxyFix # <-- NOWY IMPORT
 
 login_manager = LoginManager()
 bcrypt = Bcrypt()
 mail = Mail()
-migrate = Migrate() # <-- NOWY OBIEKT
+migrate = Migrate()
 
 def format_datetime_local(dt):
     if dt is None:
@@ -30,11 +31,17 @@ def format_day_of_week(dt):
 
 def create_app():
     app = Flask(__name__)
+
+    # === POCZĄTEK ZMIANY ===
+    # Informujemy aplikację, że działa za proxy i powinna ufać nagłówkom
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # === KONIEC ZMIANY ===
+
     app.config.from_object(Config)
     app.template_folder = 'templates'
-    
+
     db.init_app(app)
-    migrate.init_app(app, db) # <-- INICJALIZACJA
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)
@@ -43,7 +50,7 @@ def create_app():
     app.jinja_env.filters['dayofweek'] = format_day_of_week
 
     login_manager.login_view = 'auth.login'
-    
+
     with app.app_context():
         from .warehouse import routes as warehouse_routes
         app.register_blueprint(warehouse_routes.bp)
@@ -59,7 +66,7 @@ def create_app():
         app.register_blueprint(main_routes.bp)
         from .tasks import routes as tasks_routes
         app.register_blueprint(tasks_routes.bp)
-        
+
     @app.cli.command("init-db")
     def init_db_command():
         """Tworzy tabele, role i pierwszego admina."""
