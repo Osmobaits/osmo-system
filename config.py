@@ -18,5 +18,5 @@ class Config:
     MAIL_PORT = 587
     MAIL_USE_TLS = True
     MAIL_USERNAME = 'osmobaits@gmail.com'  # <-- WPISZ SWÓJ ADRES GMAIL
-    MAIL_PASSWORD = 'qilgodlyopgwzhaa'      # <-- WKLEJ 16-ZNAKOWE HASŁO DO APLIKACJI
+    MAIL_PASSWORD = 'vsnqcuaxdsnqdemk'      # <-- WKLEJ 16-ZNAKOWE HASŁO DO APLIKACJI
     MAIL_DEFAULT_SENDER = 'osmobaits@gmail.com'
