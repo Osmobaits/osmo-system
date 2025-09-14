@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Urlopy{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Pulpit Urlopów</h1>
+        <a href="{{ url_for('vacations.create_request') }}" class="btn btn-primary">Złóż nowy wniosek urlopowy</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+
+    {% if current_user.has_role('admin') %}
+        {# WIDOK DLA ADMINISTRATORA #}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning"><h3>Wnioski oczekujące na akceptację ({{ pending_requests|length }})</h3></div>
+            <div class="card-body">
+                {% for req in pending_requests %}
+                    <div class="border p-3 mb-3 rounded">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Pracownik:</strong> {{ req.user.username }}</p>
+                                <p><strong>Okres urlopu:</strong> {{ req.start_date.strftime('%Y-%m-%d') }} do {{ req.end_date.strftime('%Y-%m-%d') }}</p>
+                                <p><strong>Notatki pracownika:</strong> {{ req.notes or 'Brak' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <form method="POST" class="d-flex flex-column h-100">
+                                    <textarea name="admin_notes" class="form-control mb-2" rows="2" placeholder="Opcjonalne uwagi dla pracownika..."></textarea>
+                                    <div class="mt-auto text-end">
+                                        <button formaction="{{ url_for('vacations.approve_request', request_id=req.id) }}" type="submit" class="btn btn-success">Zatwierdź</button>
+                                        <button formaction="{{ url_for('vacations.reject_request', request_id=req.id) }}" type="submit" class="btn btn-danger">Odrzuć</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-center">Brak wniosków oczekujących na akceptację.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white"><h3>Zatwierdzone urlopy</h3></div>
+            <div class="card-body">
+                {# === POCZĄTEK ZMIANY: ZASTĄPIENIE SEKCJI "W BUDOWIE" === #}
+                <table class="table table-sm table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Pracownik</th>
+                            <th>Okres urlopu</th>
+                            <th>Data złożenia wniosku</th>
+                            <th>Uwagi Admina</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in approved_requests %}
+                        <tr>
+                            <td>{{ req.user.username }}</td>
+                            <td>{{ req.start_date.strftime('%Y-%m-%d') }} - {{ req.end_date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ req.request_date | localdatetime }}</td>
+                            <td>{{ req.admin_notes or 'Brak' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">Brak zatwierdzonych urlopów.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {# === KONIEC ZMIANY === #}
+            </div>
+        </div>
+
+    {% else %}
+        {# WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA #}
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Twoje wnioski urlopowe</h3></div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead><tr><th>Data złożenia</th><th>Okres urlopu</th><th>Status</th><th>Uwagi Admina</th></tr></thead>
+                    <tbody>
+                        {% for req in my_requests %}
+                        <tr>
+                            <td>{{ req.request_date | localdatetime }}</td>
+                            <td>{{ req.start_date.strftime('%Y-%m-%d') }} - {{ req.end_date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if req.status == 'Oczekuje' %} bg-warning text-dark
+                                    {% elif req.status == 'Zatwierdzony' %} bg-success
+                                    {% elif req.status == 'Odrzucony' %} bg-danger
+                                    {% endif %}
+                                ">{{ req.status }}</span>
+                            </td>
+                            <td>{{ req.admin_notes or 'Brak' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center">Nie złożyłeś jeszcze żadnych wniosków urlopowych.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
