@@ -7,11 +7,13 @@ from datetime import datetime
 
 bp = Blueprint('vacations', __name__, template_folder='templates', url_prefix='/vacations')
 
+# === POCZĄTEK ZMIANY: DODANIE DEKORATORA ===
 @bp.route('/')
 @login_required
+@permission_required('vacations')
+# === KONIEC ZMIANY ===
 def index():
     if current_user.has_role('admin'):
-        # Admin widzi wszystkie wnioski, podzielone na statusy
         pending_requests = VacationRequest.query.filter_by(status='Oczekuje').order_by(VacationRequest.request_date.desc()).all()
         approved_requests = VacationRequest.query.filter_by(status='Zatwierdzony').order_by(VacationRequest.start_date.desc()).all()
         rejected_requests = VacationRequest.query.filter_by(status='Odrzucony').order_by(VacationRequest.request_date.desc()).all()
@@ -20,12 +22,14 @@ def index():
                                approved_requests=approved_requests,
                                rejected_requests=rejected_requests)
     else:
-        # Zwykły użytkownik widzi tylko swoje wnioski
         my_requests = VacationRequest.query.filter_by(user_id=current_user.id).order_by(VacationRequest.request_date.desc()).all()
         return render_template('vacations_index.html', my_requests=my_requests)
 
+# === POCZĄTEK ZMIANY: DODANIE DEKORATORA ===
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
+@permission_required('vacations')
+# === KONIEC ZMIANY ===
 def create_request():
     if request.method == 'POST':
         start_date_str = request.form.get('start_date')

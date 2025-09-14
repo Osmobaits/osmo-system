@@ -29,9 +29,16 @@
                         <a class="nav-link" href="{{ url_for('orders.manage_clients') }}">Zamówienia</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('tasks.index') }}">Zadania</a>
+                        {# === POCZĄTEK ZMIANY: DODANIE LICZNIKA ZADAŃ === #}
+                        <a class="nav-link" href="{{ url_for('tasks.index') }}">
+                            Zadania
+                            {% if new_tasks_count > 0 %}
+                                <span class="badge bg-danger ms-1">{{ new_tasks_count }}</span>
+                            {% endif %}
+                        </a>
+                        {# === KONIEC ZMIANY === #}
                     </li>
-					<li class="nav-item">
+                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('vacations.index') }}">Urlopy</a>
                     </li>
                     {% if current_user.has_role('admin') %}

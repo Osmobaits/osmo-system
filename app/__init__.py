@@ -1,8 +1,8 @@
 # app/__init__.py
 from flask import Flask
 from config import Config
-from .models import db, User, Role
-from flask_login import LoginManager
+from .models import db, User, Role, Task
+from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -32,7 +32,6 @@ def format_day_of_week(dt):
 def create_app():
     app = Flask(__name__)
     
-    # Informujemy aplikację, że działa za proxy i powinna ufać nagłówkom
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     app.config.from_object(Config)
@@ -73,7 +72,9 @@ def create_app():
     def init_db_command():
         """Tworzy tabele, role i pierwszego admina."""
         db.create_all()
-        role_names = ['admin', 'warehouse', 'production', 'orders', 'tasks']
+        # === POCZĄTEK ZMIANY: DODANIE ROLI 'vacations' ===
+        role_names = ['admin', 'warehouse', 'production', 'orders', 'tasks', 'vacations']
+        # === KONIEC ZMIANY ===
         for name in role_names:
             if not Role.query.filter_by(name=name).first():
                 db.session.add(Role(name=name))
@@ -86,6 +87,13 @@ def create_app():
                 db.session.add(admin_user)
         db.session.commit()
         print("Baza danych zainicjalizowana z rolami i użytkownikiem admin.")
+
+    @app.context_processor
+    def inject_new_tasks_count():
+        if current_user.is_authenticated:
+            count = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').count()
+            return dict(new_tasks_count=count)
+        return dict(new_tasks_count=0)
 
     return app
 
