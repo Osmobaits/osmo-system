@@ -67,6 +67,7 @@ class RawMaterial(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), unique=True, nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    critical_stock_level = db.Column(db.Float, nullable=False, default=0)
     batches = db.relationship('RawMaterialBatch', backref='material', lazy=True, cascade="all, delete-orphan")
 
 class RawMaterialBatch(db.Model):
@@ -78,14 +79,25 @@ class RawMaterialBatch(db.Model):
     unit = db.Column(db.String(20), nullable=False)
     received_date = db.Column(db.Date, nullable=False, default=date.today)
 
+class FinishedProductCategory(db.Model):
+    __tablename__ = 'finished_product_categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    finished_products = db.relationship('FinishedProduct', backref='category', lazy=True)
+
 class FinishedProduct(db.Model):
     __tablename__ = 'finished_products'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), unique=True, nullable=False)
+    product_code = db.Column(db.String(50), unique=True, nullable=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('finished_product_categories.id'), nullable=True)
     packaging_weight_kg = db.Column(db.Float, nullable=False, default=1.0)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     recipe_components = db.relationship('RecipeComponent', backref='finished_product', lazy=True, cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
+
+    __table_args__ = (db.UniqueConstraint('product_code', name='uq_finished_products_product_code'),)
+
 
 class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
@@ -99,9 +111,10 @@ class ProductionOrder(db.Model):
     __tablename__ = 'production_orders'
     id = db.Column(db.Integer, primary_key=True)
     finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
-    quantity_produced = db.Column(db.Integer, nullable=False)
+    planned_quantity = db.Column(db.Integer, nullable=False, default=0)
+    quantity_produced = db.Column(db.Integer, nullable=False, default=0)
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    sample_required = db.Column(db.Boolean, nullable=False, default=False) # <-- NOWA LINIA
+    sample_required = db.Column(db.Boolean, nullable=False, default=False)
     finished_product = db.relationship('FinishedProduct', back_populates='production_orders')
     consumption_log = db.relationship('ProductionLog', backref='production_order', lazy=True, cascade="all, delete-orphan")
     @property

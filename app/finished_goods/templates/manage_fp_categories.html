@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Zarządzaj Kategoriami Produktów{% endblock %}
+
+{% block content %}
+    <h1 class="text-center mb-4">Zarządzaj Kategoriami Produktów Gotowych</h1>
+    <div class="mb-4">
+        <a href="{{ url_for('finished_goods.index') }}" class="btn btn-secondary">Powrót do Magazynu Produktów</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-5">
+                <div class="card-header"><h3>Dodaj nową kategorię</h3></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('finished_goods.manage_categories') }}">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="name" placeholder="Nazwa nowej kategorii" required>
+                            <button type="submit" class="btn btn-primary">Dodaj</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header"><h3>Istniejące kategorie</h3></div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for category in categories %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <form method="POST" action="{{ url_for('finished_goods.edit_category', id=category.id) }}" class="d-flex flex-grow-1">
+                                <input type="text" class="form-control" name="name" value="{{ category.name }}">
+                                <button type="submit" class="btn btn-success ms-2">Zapisz</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('finished_goods.delete_category', id=category.id) }}" onsubmit="return confirm('Czy na pewno chcesz usunąć tę kategorię?');" class="ms-2">
+                                <button type="submit" class="btn btn-danger">Usuń</button>
+                            </form>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-center">Brak zdefiniowanych kategorii.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -2,7 +2,6 @@
 {% block title %}Magazyn Surowców - Partie{% endblock %}
 
 {% block content %}
-    {# Dodajemy identyfikator na górze strony, do którego będą prowadzić linki "powrót" #}
     <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Magazyn Surowców - Zarządzanie Partiami</h1>
         <div>
@@ -14,6 +13,19 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
     {% endwith %}
+
+    {% if low_stock_materials %}
+    <div class="alert alert-danger shadow-sm" role="alert">
+        <h4 class="alert-heading">Uwaga! Niskie stany magazynowe!</h4>
+        <p>Poniższe surowce spadły poniżej zdefiniowanego poziomu krytycznego. Należy rozważyć złożenie zamówienia.</p>
+        <hr>
+        <ul class="mb-0">
+            {% for material in low_stock_materials %}
+                <li><strong>{{ material.name }}</strong> - Stan: {{ "%.2f"|format(material.current_stock) }} / Poziom krytyczny: {{ material.critical_stock_level }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     <div class="card shadow-sm mb-5">
         <div class="card-header"><h3>Przyjmij nową partię surowca</h3></div>
@@ -52,8 +64,7 @@
             </form>
         </div>
     </div>
-
-    {# === POCZĄTEK NOWEJ SEKCJI: NAWIGACJA DO KATEGORII === #}
+    
     <div class="card shadow-sm mb-4">
         <div class="card-header">
             <h3>Partie na stanie</h3>
@@ -61,17 +72,12 @@
         <div class="card-body">
             <strong>Szybka nawigacja:</strong>
             {% for category in categories if category.raw_materials %}
-                {# Tworzymy linki-kotwice do odpowiednich sekcji na stronie #}
                 <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
             {% endfor %}
         </div>
     </div>
-    {# === KONIEC NOWEJ SEKCJI === #}
-
-
-    {# === POCZĄTEK ZMIANY: OSOBNE TABELE DLA KAŻDEJ KATEGORII === #}
+    
     {% for category in categories if category.raw_materials %}
-        {# Każda sekcja ma ID odpowiadające linkowi z nawigacji #}
         <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
             <div class="card-header bg-light">
                 <h4>{{ category.name }}</h4>
@@ -89,12 +95,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {# Filtrujemy partie, aby wybrać tylko te z obecnej kategorii #}
                         {% set batches_in_category = batches | selectattr('material.category.name', 'equalto', category.name) | list %}
                         {% for batch in batches_in_category %}
-                        <tr>
+                        {% set material = batch.material %}
+                        {% set current_stock = total_stocks.get(material.id, 0) %}
+                        <tr class="{{ 'table-warning' if material.critical_stock_level > 0 and current_stock < material.critical_stock_level }}">
                             <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
-                            <td>{{ batch.material.name }}</td>
+                            <td>{{ material.name }}</td>
                             <td>{{ batch.batch_number }}</td>
                             <td>{{ batch.quantity_on_hand }}</td>
                             <td>{{ batch.unit }}</td>
@@ -113,7 +120,6 @@
                         {% endif %}
                     </tbody>
                 </table>
-                {# === NOWA SEKCJA: LINK POWROTNY === #}
                 <div class="text-end mt-2">
                     <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
                 </div>
@@ -128,5 +134,4 @@
             </div>
         </div>
     {% endif %}
-    {# === KONIEC ZMIANY === #}
 {% endblock %}

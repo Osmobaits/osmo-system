@@ -11,9 +11,15 @@
             <div class="card-body">
                 <p><strong>Produkt:</strong> {{ batch.finished_product.name }}</p>
                 <p><strong>Data produkcji:</strong> {{ batch.order_date | localdatetime }}</p>
+                {# === POCZĄTEK ZMIANY: DODANIE INFORMACJI O PLANIE === #}
+                <p><strong>Ilość zaplanowana:</strong> <span class="badge bg-secondary fs-6">{{ batch.planned_quantity }}</span></p>
+                <hr>
+                {# === KONIEC ZMIANY === #}
                 <form method="POST">
                     <div class="mb-3">
-                        <label for="quantity" class="form-label">Wyprodukowana ilość:</label>
+                        {# === POCZĄTEK ZMIANY: ZMIANA ETYKIETY === #}
+                        <label for="quantity" class="form-label">Rzeczywista ilość wyprodukowana:</label>
+                        {# === KONIEC ZMIANY === #}
                         <input type="number" class="form-control" id="quantity" name="quantity" value="{{ batch.quantity_produced }}" required>
                     </div>
                     <button type="submit" class="btn btn-primary">Zapisz zmiany</button>

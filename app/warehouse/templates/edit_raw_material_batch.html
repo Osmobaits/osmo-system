@@ -6,9 +6,7 @@
     <div class="col-md-8">
         <div class="card shadow-sm">
             <div class="card-header">
-                {# === POCZĄTEK ZMIANY === #}
                 <h3>Edytuj partię surowca: {{ batch.material.name }}</h3>
-                {# === KONIEC ZMIANY === #}
             </div>
             <div class="card-body">
                 <form method="POST">
@@ -25,7 +23,9 @@
                     <div class="row">
                         <div class="col-md-8 mb-3">
                             <label for="quantity_on_hand" class="form-label">Ilość na stanie</label>
-                            <input type="number" step="0.01" class="form-control" id="quantity_on_hand" name="quantity_on_hand" value="{{ batch.quantity_on_hand }}" required>
+                            {# === POCZĄTEK ZMIANY: ZMIANA 'step' === #}
+                            <input type="number" step="any" class="form-control" id="quantity_on_hand" name="quantity_on_hand" value="{{ batch.quantity_on_hand }}" required>
+                            {# === KONIEC ZMIANY === #}
                         </div>
                          <div class="col-md-4 mb-3">
                             <label for="unit" class="form-label">Jednostka</label>

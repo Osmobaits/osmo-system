@@ -18,7 +18,7 @@
         <div class="card-header"><h3>Historia Produkcji (Partie)</h3></div>
         <div class="card-body">
             {% if production_history %}
-                {% for group in production_history | groupby('production_date') %}
+                {% for group in (production_history | groupby('production_date')) | reverse %}
                     <div class="mb-4">
                         <h4 class="border-bottom pb-2 mb-3">
                             {{ group.grouper.strftime('%Y-%m-%d') }} ({{ group.grouper | dayofweek }})
@@ -27,7 +27,10 @@
                             <thead>
                                 <tr>
                                     <th>Produkt</th>
-                                    <th>Ilość</th>
+                                    {# === POCZĄTEK ZMIANY: NOWE KOLUMNY === #}
+                                    <th class="text-center">Ilość Zaplanowana</th>
+                                    <th class="text-center">Ilość Wyprodukowana</th>
+                                    {# === KONIEC ZMIANY === #}
                                     <th>Godzina</th>
                                     <th class="text-end">Akcje</th>
                                 </tr>
@@ -35,7 +38,6 @@
                             <tbody>
                                 {% for batch in group.list %}
                                 <tr>
-                                    {# === POCZĄTEK ZMIANY: DODANIE LINKU === #}
                                     <td>
                                         <a href="{{ url_for('production.production_order_details', order_id=batch.id) }}" class="fw-bold">
                                             {{ batch.finished_product.name }}
@@ -44,8 +46,10 @@
                                             <span class="badge bg-danger ms-2">Wymagana próbka</span>
                                         {% endif %}
                                     </td>
+                                    {# === POCZĄTEK ZMIANY: NOWE DANE === #}
+                                    <td class="text-center">{{ batch.planned_quantity }}</td>
+                                    <td class="text-center fw-bold">{{ batch.quantity_produced }}</td>
                                     {# === KONIEC ZMIANY === #}
-                                    <td>{{ batch.quantity_produced }}</td>
                                     <td>{{ batch.order_date | localdatetime }}</td>
                                     <td class="text-end">
                                         <a href="{{ url_for('production.edit_batch', order_id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>

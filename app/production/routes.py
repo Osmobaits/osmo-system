@@ -1,6 +1,6 @@
 # app/production/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog
+from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory
 from flask_login import login_required
 from app.decorators import permission_required
 import math
@@ -21,22 +21,29 @@ def manage_products():
 def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
+        # === POCZĄTEK ZMIANY ===
+        product_code = request.form.get('product_code')
+        # === KONIEC ZMIANY ===
         packaging_weight = request.form.get('packaging_weight', type=float)
+        category_id = request.form.get('category_id', type=int)
         
         existing = FinishedProduct.query.filter_by(name=name).first()
         if existing:
             flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
             return redirect(url_for('production.manage_catalogue'))
 
-        if name and packaging_weight:
-            new_product = FinishedProduct(name=name, packaging_weight_kg=packaging_weight)
+        # === POCZĄTEK ZMIANY ===
+        if name and product_code and packaging_weight and category_id:
+            new_product = FinishedProduct(name=name, product_code=product_code, packaging_weight_kg=packaging_weight, category_id=category_id)
             db.session.add(new_product)
             db.session.commit()
             flash(f"Dodano produkt '{name}' do katalogu.", "success")
+        # === KONIEC ZMIANY ===
         return redirect(url_for('production.manage_catalogue'))
     
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
-    return render_template('manage_catalogue.html', products=products)
+    categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
+    return render_template('manage_catalogue.html', products=products, categories=categories)
 
 @bp.route('/catalogue/edit/<int:id>', methods=['POST'])
 @login_required
@@ -44,7 +51,11 @@ def manage_catalogue():
 def edit_catalogue_product(id):
     product = FinishedProduct.query.get_or_404(id)
     product.name = request.form.get('name')
+    # === POCZĄTEK ZMIANY ===
+    product.product_code = request.form.get('product_code')
+    # === KONIEC ZMIANY ===
     product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
+    product.category_id = request.form.get('category_id', type=int)
     db.session.commit()
     flash("Zapisano zmiany w produkcie.", "success")
     return redirect(url_for('production.manage_catalogue'))
@@ -182,7 +193,8 @@ def manage_production_orders():
         try:
             new_order = ProductionOrder(
                 finished_product_id=product.id,
-                quantity_produced=final_packaged_quantity,
+                planned_quantity=final_packaged_quantity,
+                quantity_produced=0,
                 sample_required=sample_needed
             )
             db.session.add(new_order)
@@ -199,10 +211,8 @@ def manage_production_orders():
                 )
                 db.session.add(log_entry)
             
-            product.quantity_in_stock += final_packaged_quantity
-            
             db.session.commit()
-            flash(f"Wyprodukowano {final_packaged_quantity} opakowań produktu '{product.name}'.", "success")
+            flash(f"Zlecenie na {final_packaged_quantity} opakowań '{product.name}' zostało utworzone. Uzupełnij rzeczywistą ilość w edycji.", "success")
         except Exception as e:
             db.session.rollback()
             flash(f"Wystąpił błąd podczas produkcji: {e}", "danger")
@@ -213,41 +223,75 @@ def manage_production_orders():
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).limit(20).all()
     return render_template('production_orders.html', products=products, orders=orders)
 
-
 @bp.route('/batch/edit/<int:order_id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('production')
 def edit_batch(order_id):
-    batch = ProductionOrder.query.get_or_404(order_id)
+    order = ProductionOrder.query.get_or_404(order_id)
+    original_produced_quantity = order.quantity_produced
+
     if request.method == 'POST':
-        batch.quantity_produced = request.form.get('quantity', type=int)
-        db.session.commit()
-        flash("Zaktualizowano ilość w partii produkcyjnej.", "success")
-        return redirect(url_for('production.manage_products'))
-    return render_template('edit_batch.html', batch=batch)
+        new_produced_quantity = request.form.get('quantity', type=int)
+        
+        if new_produced_quantity is None or new_produced_quantity < 0:
+            flash("Podano nieprawidłową ilość.", "danger")
+            return redirect(url_for('production.edit_batch', order_id=order_id))
+        
+        try:
+            quantity_difference = new_produced_quantity - original_produced_quantity
+            
+            if quantity_difference != 0:
+                product = order.finished_product
+                product.quantity_in_stock += quantity_difference
+            
+            order.quantity_produced = new_produced_quantity
+            
+            db.session.commit()
+            flash(f"Zaktualizowano rzeczywistą ilość w partii.", "success")
+            return redirect(url_for('production.manage_products'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Wystąpił błąd podczas edycji: {e}", "danger")
+            return redirect(url_for('production.edit_batch', order_id=order_id))
+
+    return render_template('edit_batch.html', batch=order)
 
 
 @bp.route('/batch/delete/<int:order_id>', methods=['POST'])
 @login_required
 @permission_required('production')
 def delete_batch(order_id):
-    batch = ProductionOrder.query.get_or_404(order_id)
-    db.session.delete(batch)
-    db.session.commit()
-    flash("Usunięto wpis z historii produkcji.", "danger")
+    order = ProductionOrder.query.get_or_404(order_id)
+    
+    try:
+        for log in order.consumption_log:
+            batch = RawMaterialBatch.query.get(log.raw_material_batch_id)
+            if batch:
+                batch.quantity_on_hand += log.quantity_consumed
+        
+        product = order.finished_product
+        product.quantity_in_stock -= order.quantity_produced
+        
+        ProductionLog.query.filter_by(production_order_id=order_id).delete()
+        
+        db.session.delete(order)
+        
+        db.session.commit()
+        flash("Usunięto wpis z historii produkcji. Wszystkie surowce i produkty zostały zwrócone na stan.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Wystąpił błąd podczas usuwania zlecenia: {e}", "danger")
+        
     return redirect(url_for('production.manage_products'))
 
-# === POCZĄTEK NOWEJ FUNKCJI ===
 @bp.route('/order/<int:order_id>')
 @login_required
 @permission_required('production')
 def production_order_details(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
-    # Używamy .options(joinedload(...)) dla optymalizacji, aby uniknąć wielu zapytań do bazy w pętli
     from sqlalchemy.orm import joinedload
     consumption_logs = ProductionLog.query.options(
         joinedload(ProductionLog.batch).joinedload(RawMaterialBatch.material)
     ).filter_by(production_order_id=order_id).all()
     
     return render_template('production_order_details.html', order=order, logs=consumption_logs)
-# === KONIEC NOWEJ FUNKCJI ===

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Importuj Sprzedaż z PDF{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3>Importuj raport sprzedaży z pliku PDF</h3>
+            </div>
+            <div class="card-body">
+                <p>Wybierz plik PDF z raportem sprzedaży, aby automatycznie zaktualizować stany magazynowe produktów gotowych.</p>
+                <hr>
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="pdf_file" class="form-label">Plik z raportem (.pdf)</label>
+                        <input type="file" class="form-control" id="pdf_file" name="pdf_file" required accept=".pdf">
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-success">Importuj i zaktualizuj stany</button>
+                        <a href="{{ url_for('finished_goods.index') }}" class="btn btn-secondary">Anuluj</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

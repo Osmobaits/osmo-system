@@ -33,8 +33,25 @@ def index():
         return redirect(url_for('warehouse.index'))
 
     categories = Category.query.options(joinedload(Category.raw_materials)).order_by(Category.name).all()
-    all_batches = RawMaterialBatch.query.order_by(RawMaterialBatch.received_date.desc()).all()
-    return render_template('warehouse_index.html', categories=categories, batches=all_batches)
+    all_batches = RawMaterialBatch.query.all()
+
+    total_stocks = {}
+    for batch in all_batches:
+        total_stocks[batch.raw_material_id] = total_stocks.get(batch.raw_material_id, 0) + batch.quantity_on_hand
+
+    low_stock_materials = []
+    all_materials = RawMaterial.query.all()
+    for material in all_materials:
+        current_stock = total_stocks.get(material.id, 0)
+        if material.critical_stock_level > 0 and current_stock < material.critical_stock_level:
+            material.current_stock = current_stock
+            low_stock_materials.append(material)
+
+    return render_template('warehouse_index.html', 
+                           categories=categories, 
+                           batches=all_batches, 
+                           low_stock_materials=low_stock_materials,
+                           total_stocks=total_stocks)
 
 
 @bp.route('/batch/edit/<int:id>', methods=['GET', 'POST'])
@@ -53,16 +70,15 @@ def edit_batch(id):
         db.session.commit()
         flash(f"Zaktualizowano dane partii nr: {batch_to_edit.batch_number}", "success")
         return redirect(url_for('warehouse.index'))
-    
-    # === POCZĄTEK ZMIANY ===
+        
     return render_template('edit_raw_material_batch.html', batch=batch_to_edit)
-    # === KONIEC ZMIANY ===
 
 @bp.route('/batch/delete/<int:id>', methods=['POST'])
 @login_required
 @permission_required('warehouse')
 def delete_batch(id):
     batch_to_delete = RawMaterialBatch.query.get_or_404(id)
+    
     usage_in_log = ProductionLog.query.filter_by(raw_material_batch_id=id).first()
     
     if usage_in_log:
@@ -74,6 +90,7 @@ def delete_batch(id):
         
     return redirect(url_for('warehouse.index'))
 
+
 @bp.route('/catalogue', methods=['GET', 'POST'])
 @login_required
 @permission_required('warehouse')
@@ -81,6 +98,7 @@ def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
         category_id = request.form.get('category_id')
+        
         if name and category_id:
             existing_material = RawMaterial.query.filter_by(name=name).first()
             if existing_material:
@@ -90,6 +108,7 @@ def manage_catalogue():
                 db.session.add(new_material)
                 db.session.commit()
                 flash(f"Dodano surowiec '{name}' do katalogu.", "success")
+        
         return redirect(url_for('warehouse.manage_catalogue'))
     
     materials = RawMaterial.query.order_by(RawMaterial.name).all()
@@ -104,6 +123,7 @@ def edit_material(id):
     if request.method == 'POST':
         material_to_edit.name = request.form.get('name')
         material_to_edit.category_id = int(request.form.get('category_id'))
+        material_to_edit.critical_stock_level = float(request.form.get('critical_stock_level', 0))
         db.session.commit()
         flash(f"Zaktualizowano surowiec: {material_to_edit.name}", "success")
         return redirect(url_for('warehouse.manage_catalogue'))

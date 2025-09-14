@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Edytuj Stan Magazynowy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3>Edytuj stan magazynowy</h3>
+            </div>
+            <div class="card-body">
+                <p class="fs-5"><strong>Produkt:</strong> {{ product.name }}</p>
+                <hr>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="quantity_in_stock" class="form-label">Nowa ilość na stanie (w opakowaniach):</label>
+                        <input type="number" class="form-control" id="quantity_in_stock" name="quantity_in_stock" value="{{ product.quantity_in_stock }}" required min="0">
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                        <a href="{{ url_for('finished_goods.index') }}" class="btn btn-secondary">Anuluj</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

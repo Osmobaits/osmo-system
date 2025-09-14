@@ -1,8 +1,8 @@
-"""Add sample_required to ProductionOrder
+"""Initial migration
 
-Revision ID: 641c0216a3bd
+Revision ID: bc18f8f86e4b
 Revises: 
-Create Date: 2025-09-12 13:03:53.872594
+Create Date: 2025-09-14 13:46:43.261224
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '641c0216a3bd'
+revision = 'bc18f8f86e4b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -30,11 +30,9 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
-    op.create_table('finished_products',
+    op.create_table('finished_product_categories',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(length=150), nullable=False),
-    sa.Column('packaging_weight_kg', sa.Float(), nullable=False),
-    sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -60,6 +58,18 @@ def upgrade():
     sa.ForeignKeyConstraint(['client_id'], ['clients.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('finished_products',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=150), nullable=False),
+    sa.Column('product_code', sa.String(length=50), nullable=True),
+    sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.Column('packaging_weight_kg', sa.Float(), nullable=False),
+    sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['category_id'], ['finished_product_categories.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name'),
+    sa.UniqueConstraint('product_code')
+    )
     op.create_table('orders',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.Integer(), nullable=False),
@@ -67,15 +77,6 @@ def upgrade():
     sa.Column('is_archived', sa.Boolean(), nullable=False),
     sa.Column('invoice_number', sa.String(length=100), nullable=True),
     sa.ForeignKeyConstraint(['client_id'], ['clients.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('production_orders',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('finished_product_id', sa.Integer(), nullable=False),
-    sa.Column('quantity_produced', sa.Integer(), nullable=False),
-    sa.Column('order_date', sa.DateTime(), nullable=False),
-    sa.Column('sample_required', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('raw_materials',
@@ -113,6 +114,16 @@ def upgrade():
     sa.Column('quantity_packed', sa.Integer(), nullable=False),
     sa.Column('quantity_wykulane', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('production_orders',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('finished_product_id', sa.Integer(), nullable=False),
+    sa.Column('planned_quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity_produced', sa.Integer(), nullable=False),
+    sa.Column('order_date', sa.DateTime(), nullable=False),
+    sa.Column('sample_required', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('raw_material_batches',
@@ -168,16 +179,17 @@ def downgrade():
     op.drop_table('task_assignees')
     op.drop_table('recipe_components')
     op.drop_table('raw_material_batches')
+    op.drop_table('production_orders')
     op.drop_table('order_products')
     op.drop_table('user_roles')
     op.drop_table('tasks')
     op.drop_table('raw_materials')
-    op.drop_table('production_orders')
     op.drop_table('orders')
+    op.drop_table('finished_products')
     op.drop_table('client_products')
     op.drop_table('users')
     op.drop_table('roles')
-    op.drop_table('finished_products')
+    op.drop_table('finished_product_categories')
     op.drop_table('clients')
     op.drop_table('categories')
     # ### end Alembic commands ###
