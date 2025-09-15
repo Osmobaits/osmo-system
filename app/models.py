@@ -85,16 +85,25 @@ class FinishedProductCategory(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     finished_products = db.relationship('FinishedProduct', backref='category', lazy=True)
 
+class Packaging(db.Model):
+    __tablename__ = 'packaging'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), unique=True, nullable=False)
+    quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
+    products = db.relationship('FinishedProduct', backref='packaging', lazy=True)
+
 class FinishedProduct(db.Model):
     __tablename__ = 'finished_products'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), unique=True, nullable=False)
     product_code = db.Column(db.String(50), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('finished_product_categories.id'), nullable=True)
+    packaging_id = db.Column(db.Integer, db.ForeignKey('packaging.id'), nullable=True)
     packaging_weight_kg = db.Column(db.Float, nullable=False, default=1.0)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     recipe_components = db.relationship('RecipeComponent', backref='finished_product', lazy=True, cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
+    __table_args__ = (db.UniqueConstraint('product_code', name='uq_finished_products_product_code'),)
 
 class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
@@ -157,7 +166,6 @@ class OrderProduct(db.Model):
     quantity_packed = db.Column(db.Integer, nullable=False, default=0)
     quantity_wykulane = db.Column(db.Integer, nullable=False, default=0)
 
-# === POCZĄTEK NOWEJ SEKCJI: MODUŁ URLOPÓW ===
 class VacationRequest(db.Model):
     __tablename__ = 'vacation_requests'
     id = db.Column(db.Integer, primary_key=True)
@@ -165,10 +173,7 @@ class VacationRequest(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     request_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    status = db.Column(db.String(50), nullable=False, default='Oczekuje') # Oczekuje, Zatwierdzony, Odrzucony
+    status = db.Column(db.String(50), nullable=False, default='Oczekuje')
     notes = db.Column(db.Text, nullable=True)
     admin_notes = db.Column(db.Text, nullable=True)
-
-    # Relacja, aby łatwo uzyskać dostęp do użytkownika, który złożył wniosek
     user = db.relationship('User', backref='vacation_requests')
-# === KONIEC NOWEJ SEKCJI ===
