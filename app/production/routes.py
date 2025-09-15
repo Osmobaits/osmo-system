@@ -1,6 +1,6 @@
 # app/production/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory, Packaging
 from flask_login import login_required
 from app.decorators import permission_required
 import math
@@ -21,29 +21,45 @@ def manage_products():
 def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
-        # === POCZĄTEK ZMIANY ===
         product_code = request.form.get('product_code')
-        # === KONIEC ZMIANY ===
         packaging_weight = request.form.get('packaging_weight', type=float)
         category_id = request.form.get('category_id', type=int)
-        
-        existing = FinishedProduct.query.filter_by(name=name).first()
-        if existing:
+        packaging_id = request.form.get('packaging_id', type=int)
+
+        existing_by_name = FinishedProduct.query.filter_by(name=name).first()
+        if existing_by_name:
             flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
             return redirect(url_for('production.manage_catalogue'))
 
-        # === POCZĄTEK ZMIANY ===
-        if name and product_code and packaging_weight and category_id:
-            new_product = FinishedProduct(name=name, product_code=product_code, packaging_weight_kg=packaging_weight, category_id=category_id)
+        if name and packaging_weight and category_id:
+            new_product = FinishedProduct(
+                name=name, 
+                product_code=product_code, 
+                packaging_weight_kg=packaging_weight, 
+                category_id=category_id,
+                packaging_id=packaging_id if packaging_id else None
+            )
             db.session.add(new_product)
             db.session.commit()
             flash(f"Dodano produkt '{name}' do katalogu.", "success")
-        # === KONIEC ZMIANY ===
         return redirect(url_for('production.manage_catalogue'))
     
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
-    return render_template('manage_catalogue.html', products=products, categories=categories)
+    all_packaging = Packaging.query.order_by(Packaging.name).all()
+    return render_template('manage_catalogue.html', products=products, categories=categories, all_packaging=all_packaging)
+
+@bp.route('/catalogue/check_code')
+@login_required
+@permission_required('production')
+def check_product_code():
+    code = request.args.get('code', '', type=str)
+    if not code:
+        return jsonify({'exists': False})
+    
+    product = FinishedProduct.query.filter_by(product_code=code).first()
+    return jsonify({'exists': product is not None})
+
 
 @bp.route('/catalogue/edit/<int:id>', methods=['POST'])
 @login_required
@@ -51,11 +67,11 @@ def manage_catalogue():
 def edit_catalogue_product(id):
     product = FinishedProduct.query.get_or_404(id)
     product.name = request.form.get('name')
-    # === POCZĄTEK ZMIANY ===
     product.product_code = request.form.get('product_code')
-    # === KONIEC ZMIANY ===
     product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
     product.category_id = request.form.get('category_id', type=int)
+    packaging_id = request.form.get('packaging_id', type=int)
+    product.packaging_id = packaging_id if packaging_id else None
     db.session.commit()
     flash("Zapisano zmiany w produkcie.", "success")
     return redirect(url_for('production.manage_catalogue'))
@@ -114,6 +130,7 @@ def delete_recipe_component(id):
     db.session.commit()
     flash("Usunięto składnik z receptury.", "danger")
     return redirect(url_for('production.manage_recipe', id=product_id))
+
 
 @bp.route('/orders', methods=['GET', 'POST'])
 @login_required
@@ -242,7 +259,12 @@ def edit_batch(order_id):
             if quantity_difference != 0:
                 product = order.finished_product
                 product.quantity_in_stock += quantity_difference
-            
+
+                # === POCZĄTEK ZMIANY: ZARZĄDZANIE STANEM OPAKOWAŃ ===
+                if product.packaging:
+                    product.packaging.quantity_in_stock -= quantity_difference
+                # === KONIEC ZMIANY ===
+
             order.quantity_produced = new_produced_quantity
             
             db.session.commit()
@@ -263,20 +285,26 @@ def delete_batch(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
     
     try:
+        # Zwracanie surowców
         for log in order.consumption_log:
             batch = RawMaterialBatch.query.get(log.raw_material_batch_id)
             if batch:
                 batch.quantity_on_hand += log.quantity_consumed
         
         product = order.finished_product
+        # Zwrot produktu gotowego
         product.quantity_in_stock -= order.quantity_produced
         
+        # === POCZĄTEK ZMIANY: ZWROT OPAKOWAŃ ===
+        if product.packaging:
+            product.packaging.quantity_in_stock += order.quantity_produced
+        # === KONIEC ZMIANY ===
+        
         ProductionLog.query.filter_by(production_order_id=order_id).delete()
-        
         db.session.delete(order)
-        
         db.session.commit()
-        flash("Usunięto wpis z historii produkcji. Wszystkie surowce i produkty zostały zwrócone na stan.", "success")
+        
+        flash("Usunięto wpis z historii produkcji. Wszystkie surowce, produkty i opakowania zostały zwrócone na stan.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Wystąpił błąd podczas usuwania zlecenia: {e}", "danger")
