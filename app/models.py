@@ -103,7 +103,6 @@ class FinishedProduct(db.Model):
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     recipe_components = db.relationship('RecipeComponent', backref='finished_product', lazy=True, cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
-    __table_args__ = (db.UniqueConstraint('product_code', name='uq_finished_products_product_code'),)
 
 class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
