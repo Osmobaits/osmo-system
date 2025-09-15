@@ -115,7 +115,6 @@ def delete_recipe_component(id):
     flash("Usunięto składnik z receptury.", "danger")
     return redirect(url_for('production.manage_recipe', id=product_id))
 
-
 @bp.route('/orders', methods=['GET', 'POST'])
 @login_required
 @permission_required('production')
