@@ -85,12 +85,29 @@ class FinishedProductCategory(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     finished_products = db.relationship('FinishedProduct', backref='category', lazy=True)
 
+class PackagingCategory(db.Model):
+    __tablename__ = 'packaging_categories'
+    id = db.Column(db.Integer, primary_key=True)
+    # === POCZĄTEK ZMIANY ===
+    name = db.Column(db.String(100), nullable=False)
+    # === KONIEC ZMIANY ===
+    packaging_items = db.relationship('Packaging', backref='category', lazy=True)
+    # === POCZĄTEK NOWEJ SEKCJI ===
+    __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_categories_name'),)
+    # === KONIEC NOWEJ SEKCJI ===
+
 class Packaging(db.Model):
     __tablename__ = 'packaging'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), unique=True, nullable=False)
+    # === POCZĄTEK ZMIANY ===
+    name = db.Column(db.String(150), nullable=False)
+    # === KONIEC ZMIANY ===
+    category_id = db.Column(db.Integer, db.ForeignKey('packaging_categories.id'), nullable=True)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     products = db.relationship('FinishedProduct', backref='packaging', lazy=True)
+    # === POCZĄTEK NOWEJ SEKCJI ===
+    __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_name'),)
+    # === KONIEC NOWEJ SEKCJI ===
 
 class FinishedProduct(db.Model):
     __tablename__ = 'finished_products'
