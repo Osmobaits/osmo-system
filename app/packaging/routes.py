@@ -29,8 +29,14 @@ def index():
             flash("Nazwa, kategoria i ilość są wymagane.", "danger")
         return redirect(url_for('packaging.index'))
 
+    # === POCZĄTEK ZMIANY ===
+    # Pobieramy kategorie z przypisanymi opakowaniami
     categories = PackagingCategory.query.options(joinedload(PackagingCategory.packaging_items)).order_by(PackagingCategory.name).all()
-    return render_template('packaging_index.html', categories=categories)
+    # Pobieramy osobną listę opakowań bez kategorii
+    uncategorized_packaging = Packaging.query.filter(Packaging.category_id == None).order_by(Packaging.name).all()
+    
+    return render_template('packaging_index.html', categories=categories, uncategorized_packaging=uncategorized_packaging)
+    # === KONIEC ZMIANY ===
 
 @bp.route('/edit_stock/<int:packaging_id>', methods=['GET', 'POST'])
 @login_required
@@ -63,7 +69,6 @@ def delete_packaging(packaging_id):
     return redirect(url_for('packaging.index'))
 
 
-# === NOWE FUNKCJE DO ZARZĄDZANIA KATEGORIAMI ===
 @bp.route('/categories', methods=['GET', 'POST'])
 @login_required
 @permission_required('admin')
