@@ -34,48 +34,16 @@
                             <label class="form-label">Ilość początkowa</label>
                             <input type="number" name="quantity" class="form-control" min="0" value="0" required>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Poziom krytyczny</label>
+                            <input type="number" name="critical_stock_level" class="form-control" min="0" value="100" required>
+                        </div>
                         <button type="submit" class="btn btn-primary">Dodaj na stan</button>
                     </form>
                 </div>
             </div>
         </div>
         <div class="col-md-8">
-            {# === POCZĄTEK NOWEJ SEKCJI: OPAKOWANIA BEZ KATEGORII === #}
-            {% if uncategorized_packaging %}
-            <div class="card shadow-sm mb-4 border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h4>Opakowania nieprzypisane do kategorii</h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">Poniższe opakowania nie mają przypisanej kategorii. Nie będą widoczne w menu wyboru, dopóki ich nie przypiszesz. Możesz je usunąć lub edytować, aby przypisać kategorię.</p>
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nazwa Opakowania</th>
-                                <th class="text-center">Ilość na stanie</th>
-                                <th class="text-end">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in uncategorized_packaging %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td class="text-center">{{ item.quantity_in_stock }}</td>
-                                <td class="text-end">
-                                    <a href="{{ url_for('packaging.edit_stock', packaging_id=item.id) }}" class="btn btn-warning btn-sm">Edytuj ilość</a>
-                                    <form method="POST" action="{{ url_for('packaging.delete_packaging', packaging_id=item.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć to opakowanie?');">
-                                        <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {% endif %}
-            {# === KONIEC NOWEJ SEKCJI === #}
-
             {% for category in categories if category.packaging_items %}
                 <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
                     <div class="card-header bg-light">
@@ -92,11 +60,16 @@
                             </thead>
                             <tbody>
                                 {% for item in category.packaging_items %}
-                                <tr>
-                                    <td>{{ item.name }}</td>
+                                <tr class="{{ 'table-danger' if item.quantity_in_stock < item.critical_stock_level and item.critical_stock_level > 0 }}">
+                                <td>
+                                        {{ item.name }}
+                                        {% if item.quantity_in_stock < item.critical_stock_level and item.critical_stock_level > 0 %}
+                                            <span class="badge bg-danger ms-2">Niski stan!</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="text-center">{{ item.quantity_in_stock }}</td>
                                     <td class="text-end">
-                                        <a href="{{ url_for('packaging.edit_stock', packaging_id=item.id) }}" class="btn btn-warning btn-sm">Edytuj ilość</a>
+                                        <a href="{{ url_for('packaging.edit_stock', packaging_id=item.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
                                         <form method="POST" action="{{ url_for('packaging.delete_packaging', packaging_id=item.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć to opakowanie?');">
                                             <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
                                         </form>

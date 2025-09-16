@@ -89,9 +89,7 @@ class PackagingCategory(db.Model):
     __tablename__ = 'packaging_categories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    # === POCZĄTEK ZMIANY: DODANIE 'order_by' ===
     packaging_items = db.relationship('Packaging', backref='category', lazy=True, order_by='Packaging.quantity_in_stock')
-    # === KONIEC ZMIANY ===
     __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_categories_name'),)
 
 class Packaging(db.Model):
@@ -100,6 +98,7 @@ class Packaging(db.Model):
     name = db.Column(db.String(150), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('packaging_categories.id'), nullable=True)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
+    critical_stock_level = db.Column(db.Integer, nullable=False, default=0)
     products = db.relationship('FinishedProduct', backref='packaging', lazy=True)
     __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_name'),)
 

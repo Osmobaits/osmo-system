@@ -15,28 +15,23 @@ def index():
         name = request.form.get('name')
         quantity = request.form.get('quantity', type=int)
         category_id = request.form.get('category_id', type=int)
+        critical_stock_level = request.form.get('critical_stock_level', type=int) # <-- NOWA LINIA
 
-        if name and quantity is not None and quantity >= 0 and category_id:
+        if name and quantity is not None and quantity >= 0 and category_id and critical_stock_level is not None: # <-- ZMIANA
             existing_packaging = Packaging.query.filter_by(name=name).first()
             if existing_packaging:
                 flash(f"Opakowanie o nazwie '{name}' już istnieje.", "warning")
             else:
-                new_packaging = Packaging(name=name, quantity_in_stock=quantity, category_id=category_id)
+                new_packaging = Packaging(name=name, quantity_in_stock=quantity, category_id=category_id, critical_stock_level=critical_stock_level) # <-- ZMIANA
                 db.session.add(new_packaging)
                 db.session.commit()
                 flash(f"Dodano nowe opakowanie '{name}' na stan.", "success")
         else:
-            flash("Nazwa, kategoria i ilość są wymagane.", "danger")
+            flash("Wszystkie pola są wymagane.", "danger")
         return redirect(url_for('packaging.index'))
 
-    # === POCZĄTEK ZMIANY ===
-    # Pobieramy kategorie z przypisanymi opakowaniami
     categories = PackagingCategory.query.options(joinedload(PackagingCategory.packaging_items)).order_by(PackagingCategory.name).all()
-    # Pobieramy osobną listę opakowań bez kategorii
-    uncategorized_packaging = Packaging.query.filter(Packaging.category_id == None).order_by(Packaging.name).all()
-    
-    return render_template('packaging_index.html', categories=categories, uncategorized_packaging=uncategorized_packaging)
-    # === KONIEC ZMIANY ===
+    return render_template('packaging_index.html', categories=categories)
 
 @bp.route('/edit_stock/<int:packaging_id>', methods=['GET', 'POST'])
 @login_required
@@ -45,13 +40,16 @@ def edit_stock(packaging_id):
     packaging_item = Packaging.query.get_or_404(packaging_id)
     if request.method == 'POST':
         new_quantity = request.form.get('quantity_in_stock', type=int)
-        if new_quantity is not None and new_quantity >= 0:
+        critical_stock_level = request.form.get('critical_stock_level', type=int) # <-- NOWA LINIA
+        
+        if new_quantity is not None and new_quantity >= 0 and critical_stock_level is not None: # <-- ZMIANA
             packaging_item.quantity_in_stock = new_quantity
+            packaging_item.critical_stock_level = critical_stock_level # <-- NOWA LINIA
             db.session.commit()
-            flash(f"Zaktualizowano stan magazynowy dla '{packaging_item.name}'.", "success")
+            flash(f"Zaktualizowano dane dla '{packaging_item.name}'.", "success")
             return redirect(url_for('packaging.index'))
         else:
-            flash("Podano nieprawidłową wartość.", "danger")
+            flash("Podano nieprawidłowe wartości.", "danger")
     
     return render_template('edit_packaging_stock.html', packaging_item=packaging_item)
 
