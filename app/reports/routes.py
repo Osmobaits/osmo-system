@@ -1,6 +1,6 @@
 # app/reports/routes.py
 from flask import Blueprint, render_template, Response
-from app.models import FinishedProductCategory, Category, PackagingCategory
+from app.models import FinishedProductCategory, Category, PackagingCategory, RawMaterial
 from flask_login import login_required
 from sqlalchemy.orm import joinedload
 from weasyprint import HTML
