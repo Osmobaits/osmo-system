@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Arkusz Inwentaryzacyjny</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: sans-serif; font-size: 10pt; }
+        h1 { text-align: center; margin-bottom: 2rem; }
+        h2 { border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 2.5rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .category-header { background-color: #e9ecef; font-weight: bold; }
+        .signature { margin-top: 4rem; text-align: right; }
+        .signature-line { border-top: 1px solid black; width: 200px; display: inline-block; margin-top: 3rem; }
+    </style>
+</head>
+<body>
+    <h1>Arkusz Inwentaryzacyjny - {{ "now"|localdatetime }}</h1>
+
+    <h2>Produkty Gotowe</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nazwa Produktu</th>
+                <th>Aktualny Stan Systemowy (szt.)</th>
+                <th style="width: 30%;">Ilość Rzeczywista (spis z natury)</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for category in finished_product_categories %}
+            {% if category.finished_products %}
+            <tr><td colspan="3" class="category-header">{{ category.name }}</td></tr>
+            {% for product in category.finished_products %}
+            <tr>
+                <td>{{ product.name }}</td>
+                <td>{{ product.quantity_in_stock }}</td>
+                <td></td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Surowce</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nazwa Surowca / Nr Partii</th>
+                <th>Aktualny Stan Systemowy (kg)</th>
+                <th style="width: 30%;">Ilość Rzeczywista (spis z natury)</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for category in raw_material_categories %}
+            {% if category.raw_materials %}
+            <tr><td colspan="3" class="category-header">{{ category.name }}</td></tr>
+            {% for material in category.raw_materials %}
+                {% for batch in material.batches %}
+                <tr>
+                    <td>{{ material.name }} / <strong>{{ batch.batch_number }}</strong></td>
+                    <td>{{ batch.quantity_on_hand }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+            {% endif %}
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Opakowania</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nazwa Opakowania</th>
+                <th>Aktualny Stan Systemowy (szt.)</th>
+                <th style="width: 30%;">Ilość Rzeczywista (spis z natury)</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for category in packaging_categories %}
+            {% if category.packaging_items %}
+            <tr><td colspan="3" class="category-header">{{ category.name }}</td></tr>
+            {% for item in category.packaging_items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.quantity_in_stock }}</td>
+                <td></td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="signature">
+        <p>Podpis osoby sporządzającej:</p>
+        <div class="signature-line"></div>
+    </div>
+</body>
+</html>

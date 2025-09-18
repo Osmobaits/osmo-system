@@ -69,6 +69,8 @@ def create_app():
         app.register_blueprint(vacations_routes.bp)
         from .packaging import routes as packaging_routes
         app.register_blueprint(packaging_routes.bp)
+        from .reports import routes as reports_routes
+        app.register_blueprint(reports_routes.bp)
         
     @app.cli.command("init-db")
     def init_db_command():
