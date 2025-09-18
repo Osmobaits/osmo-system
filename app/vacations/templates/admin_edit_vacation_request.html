@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Edycja Admina: Wniosek Urlopowy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Edycja wniosku urlopowego (Admin)</h3></div>
+            <div class="card-body">
+                <p><strong>Pracownik:</strong> {{ req.user.username }}</p>
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="start_date" class="form-label">Data rozpoczęcia</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ req.start_date.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="end_date" class="form-label">Data zakończenia</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ req.end_date.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Status wniosku</label>
+                        <select id="status" name="status" class="form-select">
+                            <option value="Oczekuje" {% if req.status == 'Oczekuje' %}selected{% endif %}>Oczekuje</option>
+                            <option value="Zatwierdzony" {% if req.status == 'Zatwierdzony' %}selected{% endif %}>Zatwierdzony</option>
+                            <option value="Odrzucony" {% if req.status == 'Odrzucony' %}selected{% endif %}>Odrzucony</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notatki pracownika</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3">{{ req.notes or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="admin_notes" class="form-label">Notatki administratora</label>
+                        <textarea class="form-control" id="admin_notes" name="admin_notes" rows="3">{{ req.admin_notes or '' }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Zapisz zmiany</button>
+                    <a href="{{ url_for('vacations.index') }}" class="btn btn-secondary">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
