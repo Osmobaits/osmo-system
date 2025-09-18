@@ -44,16 +44,8 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-success text-white"><h3>Zatwierdzone urlopy</h3></div>
             <div class="card-body">
-                {# === POCZĄTEK ZMIANY: ZASTĄPIENIE SEKCJI "W BUDOWIE" === #}
                 <table class="table table-sm table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Pracownik</th>
-                            <th>Okres urlopu</th>
-                            <th>Data złożenia wniosku</th>
-                            <th>Uwagi Admina</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Pracownik</th><th>Okres urlopu</th><th>Data złożenia wniosku</th><th>Uwagi Admina</th></tr></thead>
                     <tbody>
                         {% for req in approved_requests %}
                         <tr>
@@ -63,13 +55,10 @@
                             <td>{{ req.admin_notes or 'Brak' }}</td>
                         </tr>
                         {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center">Brak zatwierdzonych urlopów.</td>
-                        </tr>
+                        <tr><td colspan="4" class="text-center">Brak zatwierdzonych urlopów.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                {# === KONIEC ZMIANY === #}
             </div>
         </div>
 
@@ -78,8 +67,10 @@
         <div class="card shadow-sm">
             <div class="card-header"><h3>Twoje wnioski urlopowe</h3></div>
             <div class="card-body">
-                <table class="table table-striped">
-                    <thead><tr><th>Data złożenia</th><th>Okres urlopu</th><th>Status</th><th>Uwagi Admina</th></tr></thead>
+                <table class="table table-striped table-hover">
+                    {# === POCZĄTEK ZMIANY: DODANIE KOLUMNY "AKCJE" === #}
+                    <thead><tr><th>Data złożenia</th><th>Okres urlopu</th><th>Status</th><th>Uwagi Admina</th><th>Akcje</th></tr></thead>
+                    {# === KONIEC ZMIANY === #}
                     <tbody>
                         {% for req in my_requests %}
                         <tr>
@@ -94,9 +85,19 @@
                                 ">{{ req.status }}</span>
                             </td>
                             <td>{{ req.admin_notes or 'Brak' }}</td>
+                            {# === POCZĄTEK NOWEJ SEKCJI: PRZYCISKI EDYCJI I USUWANIA === #}
+                            <td>
+                                {% if req.status == 'Oczekuje' %}
+                                    <a href="{{ url_for('vacations.edit_request', request_id=req.id) }}" class="btn btn-sm btn-info">Edytuj</a>
+                                    <form method="POST" action="{{ url_for('vacations.delete_request', request_id=req.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć ten wniosek?');">
+                                        <button type="submit" class="btn btn-sm btn-danger">Usuń</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                            {# === KONIEC NOWEJ SEKCJI === #}
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="text-center">Nie złożyłeś jeszcze żadnych wniosków urlopowych.</td></tr>
+                        <tr><td colspan="5" class="text-center">Nie złożyłeś jeszcze żadnych wniosków urlopowych.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

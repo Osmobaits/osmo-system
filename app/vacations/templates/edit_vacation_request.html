@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Edytuj wniosek urlopowy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Edytuj wniosek o urlop</h3></div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Data rozpoczęcia</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ req.start_date.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">Data zakończenia</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ req.end_date.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notatki (opcjonalnie)</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Np. urlop na żądanie">{{ req.notes or '' }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Zapisz zmiany</button>
+                    <a href="{{ url_for('vacations.index') }}" class="btn btn-secondary">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
