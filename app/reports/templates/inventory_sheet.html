@@ -17,7 +17,9 @@
     </style>
 </head>
 <body>
-    <h1>Arkusz Inwentaryzacyjny - {{ "now"|localdatetime }}</h1>
+    {# === POCZĄTEK ZMIANY === #}
+    <h1>Arkusz Inwentaryzacyjny - {{ generation_time|localdatetime }}</h1>
+    {# === KONIEC ZMIANY === #}
 
     <h2>Produkty Gotowe</h2>
     <table>

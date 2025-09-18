@@ -4,6 +4,7 @@ from app.models import FinishedProductCategory, Category, PackagingCategory, Raw
 from flask_login import login_required
 from sqlalchemy.orm import joinedload
 from weasyprint import HTML
+from datetime import datetime # <-- NOWY IMPORT
 
 bp = Blueprint('reports', __name__, template_folder='templates', url_prefix='/reports')
 
@@ -23,11 +24,17 @@ def inventory_sheet_pdf():
         joinedload(PackagingCategory.packaging_items)
     ).order_by(PackagingCategory.name).all()
 
+    # === POCZĄTEK ZMIANY ===
+    # Pobieramy aktualny czas i przekazujemy go do szablonu jako obiekt
+    generation_time = datetime.now()
+    # === KONIEC ZMIANY ===
+
     # Renderowanie szablonu HTML
     rendered_html = render_template('inventory_sheet.html',
                                     finished_product_categories=finished_product_categories,
                                     raw_material_categories=raw_material_categories,
-                                    packaging_categories=packaging_categories)
+                                    packaging_categories=packaging_categories,
+                                    generation_time=generation_time) # <-- ZMIANA
 
     # Tworzenie PDF
     pdf = HTML(string=rendered_html).write_pdf()
