@@ -1,12 +1,14 @@
 # app/finished_goods/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, FinishedProductCategory, FinishedProduct
+from app.models import db, FinishedProductCategory, FinishedProduct, SalesReportLog
 from flask_login import login_required
 from app.decorators import permission_required
 from sqlalchemy.orm import joinedload
 import pdfplumber
 import io
-from markupsafe import Markup # <-- NOWY IMPORT
+import re
+from datetime import datetime
+from markupsafe import Markup
 
 bp = Blueprint('finished_goods', __name__, template_folder='templates', url_prefix='/finished_goods')
 
@@ -36,6 +38,7 @@ def edit_product_stock(product_id):
     
     return render_template('edit_fp_stock.html', product=product)
 
+# === POCZĄTEK PRZEBUDOWY: INTELIGENTNY IMPORT ===
 @bp.route('/import_sales', methods=['GET', 'POST'])
 @login_required
 @permission_required('warehouse')
@@ -52,58 +55,91 @@ def import_sales():
         
         if file and file.filename.endswith('.pdf'):
             try:
-                # === POCZĄTEK ZMIANY: ROZBUDOWA SYSTEMU RAPORTOWANIA ===
-                update_details = [] # Lista do przechowywania szczegółów aktualizacji
+                update_details = []
                 not_found_codes = []
-                
-                with pdfplumber.open(io.BytesIO(file.read())) as pdf:
+                report_date = None
+
+                pdf_content = io.BytesIO(file.read())
+                with pdfplumber.open(pdf_content) as pdf:
+                    # 1. Wyodrębnij datę raportu
+                    first_page_text = pdf.pages[0].extract_text()
+                    date_match = re.search(r'ZA OKRES: (\d{4}-\d{2}-\d{2})', first_page_text)
+                    if date_match:
+                        report_date = datetime.strptime(date_match.group(1), '%Y-%m-%d').date()
+                    else:
+                        flash("Nie udało się odnaleźć daty w raporcie PDF. Przerwano.", "danger")
+                        return redirect(url_for('finished_goods.index'))
+
+                    # 2. Przetwarzaj tabele
                     for page in pdf.pages:
                         tables = page.extract_tables()
                         for table in tables:
-                            for row in table[1:]:
+                            for row in table[1:]: # Pomijamy nagłówek
+                                # Sprawdzamy, czy wiersz jest poprawny
                                 if len(row) > 5 and row[2] and row[5]:
-                                    product_code = row[2].strip() # Usuwamy białe znaki
+                                    product_code = row[2].strip() if row[2] else None
+                                    if not product_code: continue
+
                                     try:
-                                        quantity_sold = int(row[5])
+                                        current_quantity_sold = int(row[5])
                                     except (ValueError, TypeError):
                                         continue
-                                    
+
                                     product = FinishedProduct.query.filter_by(product_code=product_code).first()
-                                    
                                     if product:
-                                        original_quantity = product.quantity_in_stock
-                                        product.quantity_in_stock -= quantity_sold
-                                        # Tworzymy szczegółowy opis operacji
-                                        details_string = (
-                                            f"<b>{product.name}</b> (Kod: {product.product_code}): "
-                                            f"{original_quantity} → {product.quantity_in_stock} (-{quantity_sold})"
-                                        )
-                                        update_details.append(details_string)
+                                        # 3. Sprawdź dziennik importów
+                                        log_entry = SalesReportLog.query.filter_by(
+                                            product_id=product.id,
+                                            report_date=report_date
+                                        ).first()
+                                        
+                                        last_logged_quantity = log_entry.quantity_sold if log_entry else 0
+                                        
+                                        quantity_to_deduct = current_quantity_sold - last_logged_quantity
+
+                                        if quantity_to_deduct > 0:
+                                            original_stock = product.quantity_in_stock
+                                            product.quantity_in_stock -= quantity_to_deduct
+                                            
+                                            details_string = (
+                                                f"<b>{product.name}</b> (Kod: {product.product_code}): "
+                                                f"{original_stock} → {product.quantity_in_stock} (-{quantity_to_deduct})"
+                                            )
+                                            update_details.append(details_string)
+
+                                        # 4. Zaktualizuj lub stwórz nowy wpis w dzienniku
+                                        if log_entry:
+                                            log_entry.quantity_sold = current_quantity_sold
+                                        else:
+                                            new_log_entry = SalesReportLog(
+                                                product_id=product.id,
+                                                report_date=report_date,
+                                                quantity_sold=current_quantity_sold
+                                            )
+                                            db.session.add(new_log_entry)
                                     else:
                                         if product_code not in not_found_codes:
                                             not_found_codes.append(product_code)
                 
                 db.session.commit()
 
-                # Przygotowanie komunikatu dla użytkownika
+                # Przygotowanie raportu dla użytkownika
                 if update_details:
-                    # Łączymy szczegóły w jeden komunikat HTML
                     details_html = "<br>".join(update_details)
                     success_message = Markup(
-                        f"<b>Import zakończony. Zaktualizowano {len(update_details)} produktów:</b><br>{details_html}"
+                        f"<b>Import dla dnia {report_date.strftime('%Y-%m-%d')} zakończony. Zaktualizowano {len(update_details)} produktów:</b><br>{details_html}"
                     )
                     flash(success_message, "success")
                 else:
-                    flash("Nie znaleziono w pliku żadnych produktów do aktualizacji.", "info")
+                    flash(f"Import dla dnia {report_date.strftime('%Y-%m-%d')} zakończony. Brak nowych sprzedaży do odnotowania.", "info")
 
                 if not_found_codes:
                     error_message = f"Uwaga: Nie znaleziono w bazie produktów o następujących kodach: {', '.join(not_found_codes)}."
                     flash(error_message, "warning")
-                # === KONIEC ZMIANY ===
 
             except Exception as e:
                 db.session.rollback()
-                flash(f"Wystąpił błąd podczas przetwarzania pliku PDF: {e}", "danger")
+                flash(f"Wystąpił krytyczny błąd podczas przetwarzania pliku PDF: {e}", "danger")
             
             return redirect(url_for('finished_goods.index'))
         else:
@@ -111,6 +147,7 @@ def import_sales():
             return redirect(request.url)
 
     return render_template('import_sales.html')
+# === KONIEC PRZEBUDOWY ===
 
 @bp.route('/categories', methods=['GET', 'POST'])
 @login_required

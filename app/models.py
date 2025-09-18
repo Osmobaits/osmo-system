@@ -186,3 +186,15 @@ class VacationRequest(db.Model):
     notes = db.Column(db.Text, nullable=True)
     admin_notes = db.Column(db.Text, nullable=True)
     user = db.relationship('User', backref='vacation_requests')
+
+# === POCZĄTEK NOWEJ SEKCJI: DZIENNIK IMPORTU SPRZEDAŻY ===
+class SalesReportLog(db.Model):
+    __tablename__ = 'sales_report_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
+    report_date = db.Column(db.Date, nullable=False)
+    quantity_sold = db.Column(db.Integer, nullable=False)
+
+    # Relacja zwrotna
+    product = db.relationship('FinishedProduct')
+# === KONIEC NOWEJ SEKCJI ===
