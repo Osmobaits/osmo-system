@@ -38,7 +38,7 @@ def edit_product_stock(product_id):
     
     return render_template('edit_fp_stock.html', product=product)
 
-# === POCZĄTEK PRZEBUDOWY: INTELIGENTNY IMPORT ===
+# === POCZĄTEK PRZEBUDOWY: LOGIKA FIFO DLA ZDUPLIKOWANYCH KODÓW ===
 @bp.route('/import_sales', methods=['GET', 'POST'])
 @login_required
 @permission_required('warehouse')
@@ -61,7 +61,6 @@ def import_sales():
 
                 pdf_content = io.BytesIO(file.read())
                 with pdfplumber.open(pdf_content) as pdf:
-                    # 1. Wyodrębnij datę raportu
                     first_page_text = pdf.pages[0].extract_text()
                     date_match = re.search(r'ZA OKRES: (\d{4}-\d{2}-\d{2})', first_page_text)
                     if date_match:
@@ -70,12 +69,10 @@ def import_sales():
                         flash("Nie udało się odnaleźć daty w raporcie PDF. Przerwano.", "danger")
                         return redirect(url_for('finished_goods.index'))
 
-                    # 2. Przetwarzaj tabele
                     for page in pdf.pages:
                         tables = page.extract_tables()
                         for table in tables:
-                            for row in table[1:]: # Pomijamy nagłówek
-                                # Sprawdzamy, czy wiersz jest poprawny
+                            for row in table[1:]:
                                 if len(row) > 5 and row[2] and row[5]:
                                     product_code = row[2].strip() if row[2] else None
                                     if not product_code: continue
@@ -85,34 +82,42 @@ def import_sales():
                                     except (ValueError, TypeError):
                                         continue
 
-                                    product = FinishedProduct.query.filter_by(product_code=product_code).first()
-                                    if product:
-                                        # 3. Sprawdź dziennik importów
+                                    # Znajdujemy WSZYSTKIE produkty z danym kodem
+                                    products = FinishedProduct.query.filter_by(product_code=product_code).order_by(FinishedProduct.id).all()
+                                    
+                                    if products:
+                                        # Sprawdzamy dziennik importów dla pierwszego znalezionego produktu (zakładamy, że log jest per kod)
                                         log_entry = SalesReportLog.query.filter_by(
-                                            product_id=product.id,
+                                            product_id=products[0].id,
                                             report_date=report_date
                                         ).first()
                                         
                                         last_logged_quantity = log_entry.quantity_sold if log_entry else 0
-                                        
                                         quantity_to_deduct = current_quantity_sold - last_logged_quantity
 
                                         if quantity_to_deduct > 0:
-                                            original_stock = product.quantity_in_stock
-                                            product.quantity_in_stock -= quantity_to_deduct
-                                            
-                                            details_string = (
-                                                f"<b>{product.name}</b> (Kod: {product.product_code}): "
-                                                f"{original_stock} → {product.quantity_in_stock} (-{quantity_to_deduct})"
-                                            )
-                                            update_details.append(details_string)
-
-                                        # 4. Zaktualizuj lub stwórz nowy wpis w dzienniku
+                                            remaining_to_deduct = quantity_to_deduct
+                                            for product in products:
+                                                if remaining_to_deduct <= 0: break
+                                                
+                                                deduction_amount = min(product.quantity_in_stock, remaining_to_deduct)
+                                                if deduction_amount > 0:
+                                                    original_stock = product.quantity_in_stock
+                                                    product.quantity_in_stock -= deduction_amount
+                                                    remaining_to_deduct -= deduction_amount
+                                                    
+                                                    details_string = (
+                                                        f"<b>{product.name}</b> (Kod: {product.product_code}): "
+                                                        f"{original_stock} → {product.quantity_in_stock} (-{deduction_amount})"
+                                                    )
+                                                    update_details.append(details_string)
+                                        
+                                        # Zaktualizuj lub stwórz nowy wpis w dzienniku
                                         if log_entry:
                                             log_entry.quantity_sold = current_quantity_sold
                                         else:
                                             new_log_entry = SalesReportLog(
-                                                product_id=product.id,
+                                                product_id=products[0].id,
                                                 report_date=report_date,
                                                 quantity_sold=current_quantity_sold
                                             )
@@ -123,11 +128,10 @@ def import_sales():
                 
                 db.session.commit()
 
-                # Przygotowanie raportu dla użytkownika
                 if update_details:
                     details_html = "<br>".join(update_details)
                     success_message = Markup(
-                        f"<b>Import dla dnia {report_date.strftime('%Y-%m-%d')} zakończony. Zaktualizowano {len(update_details)} produktów:</b><br>{details_html}"
+                        f"<b>Import dla dnia {report_date.strftime('%Y-%m-%d')} zakończony. Zaktualizowano {len(update_details)} pozycji:</b><br>{details_html}"
                     )
                     flash(success_message, "success")
                 else:
