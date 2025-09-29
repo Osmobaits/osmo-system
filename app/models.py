@@ -113,6 +113,7 @@ class FinishedProduct(db.Model):
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     recipe_components = db.relationship('RecipeComponent', backref='finished_product', lazy=True, cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
+    packaging_bill = db.relationship('ProductPackaging', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
 
 class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
@@ -187,14 +188,21 @@ class VacationRequest(db.Model):
     admin_notes = db.Column(db.Text, nullable=True)
     user = db.relationship('User', backref='vacation_requests')
 
-# === POCZĄTEK NOWEJ SEKCJI: DZIENNIK IMPORTU SPRZEDAŻY ===
+class ProductPackaging(db.Model):
+    __tablename__ = 'product_packaging'
+    id = db.Column(db.Integer, primary_key=True)
+    finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
+    packaging_id = db.Column(db.Integer, db.ForeignKey('packaging.id'), nullable=False)
+    quantity_required = db.Column(db.Integer, nullable=False, default=1)
+    product = db.relationship('FinishedProduct', back_populates='packaging_bill')
+    packaging = db.relationship('Packaging')
+
 class SalesReportLog(db.Model):
     __tablename__ = 'sales_report_logs'
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
     report_date = db.Column(db.Date, nullable=False)
     quantity_sold = db.Column(db.Integer, nullable=False)
-
-    # Relacja zwrotna
     product = db.relationship('FinishedProduct')
-# === KONIEC NOWEJ SEKCJI ===
+
+Packaging.products = db.relationship('ProductPackaging', back_populates='packaging')

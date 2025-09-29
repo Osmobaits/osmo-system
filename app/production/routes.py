@@ -1,6 +1,6 @@
 # app/production/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory, Packaging
+from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory, Packaging, ProductPackaging
 from flask_login import login_required
 from app.decorators import permission_required
 import math
@@ -24,8 +24,7 @@ def manage_catalogue():
         product_code = request.form.get('product_code')
         packaging_weight = request.form.get('packaging_weight', type=float)
         category_id = request.form.get('category_id', type=int)
-        packaging_id = request.form.get('packaging_id', type=int)
-
+        
         existing_by_name = FinishedProduct.query.filter_by(name=name).first()
         if existing_by_name:
             flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
@@ -36,22 +35,18 @@ def manage_catalogue():
                 name=name, 
                 product_code=product_code, 
                 packaging_weight_kg=packaging_weight, 
-                category_id=category_id,
-                packaging_id=packaging_id if packaging_id else None
+                category_id=category_id
             )
             db.session.add(new_product)
             db.session.commit()
             flash(f"Dodano produkt '{name}' do katalogu.", "success")
         return redirect(url_for('production.manage_catalogue'))
     
-    # === POCZĄTEK ZMIANY ===
-    # Pobieramy kategorie razem z przypisanymi produktami
     from sqlalchemy.orm import joinedload
     categories = FinishedProductCategory.query.options(
         joinedload(FinishedProductCategory.finished_products)
     ).order_by(FinishedProductCategory.name).all()
     all_packaging = Packaging.query.order_by(Packaging.name).all()
-    # === KONIEC ZMIANY ===
     
     return render_template('manage_catalogue.html', categories=categories, all_packaging=all_packaging)
 
@@ -76,8 +71,6 @@ def edit_catalogue_product(id):
     product.product_code = request.form.get('product_code')
     product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
     product.category_id = request.form.get('category_id', type=int)
-    packaging_id = request.form.get('packaging_id', type=int)
-    product.packaging_id = packaging_id if packaging_id else None
     db.session.commit()
     flash("Zapisano zmiany w produkcie.", "success")
     return redirect(url_for('production.manage_catalogue'))
@@ -266,9 +259,6 @@ def edit_batch(order_id):
                 product = order.finished_product
                 product.quantity_in_stock += quantity_difference
 
-                if product.packaging:
-                    product.packaging.quantity_in_stock -= quantity_difference
-
             order.quantity_produced = new_produced_quantity
             
             db.session.commit()
@@ -297,14 +287,12 @@ def delete_batch(order_id):
         product = order.finished_product
         product.quantity_in_stock -= order.quantity_produced
         
-        if product.packaging:
-            product.packaging.quantity_in_stock += order.quantity_produced
-        
         ProductionLog.query.filter_by(production_order_id=order_id).delete()
-        db.session.delete(order)
-        db.session.commit()
         
-        flash("Usunięto wpis z historii produkcji. Wszystkie surowce, produkty i opakowania zostały zwrócone na stan.", "success")
+        db.session.delete(order)
+        
+        db.session.commit()
+        flash("Usunięto wpis z historii produkcji. Wszystkie surowce i produkty zostały zwrócone na stan.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Wystąpił błąd podczas usuwania zlecenia: {e}", "danger")
@@ -322,3 +310,50 @@ def production_order_details(order_id):
     ).filter_by(production_order_id=order_id).all()
     
     return render_template('production_order_details.html', order=order, logs=consumption_logs)
+
+
+@bp.route('/products/<int:product_id>/packaging', methods=['GET', 'POST'])
+@login_required
+@permission_required('production')
+def manage_packaging_bill(product_id):
+    product = FinishedProduct.query.get_or_404(product_id)
+    if request.method == 'POST':
+        packaging_id = request.form.get('packaging_id', type=int)
+        quantity = request.form.get('quantity', type=int)
+
+        if packaging_id and quantity and quantity > 0:
+            existing = ProductPackaging.query.filter_by(finished_product_id=product_id, packaging_id=packaging_id).first()
+            if existing:
+                flash("To opakowanie już jest w specyfikacji. Możesz edytować jego ilość.", "warning")
+            else:
+                new_component = ProductPackaging(finished_product_id=product_id, packaging_id=packaging_id, quantity_required=quantity)
+                db.session.add(new_component)
+                db.session.commit()
+                flash("Dodano opakowanie do specyfikacji produktu.", "success")
+        else:
+            flash("Wybierz opakowanie i podaj prawidłową ilość.", "danger")
+        return redirect(url_for('production.manage_packaging_bill', product_id=product_id))
+
+    all_packaging = Packaging.query.order_by(Packaging.name).all()
+    return render_template('manage_packaging_bill.html', product=product, all_packaging=all_packaging)
+
+@bp.route('/packaging_bill/edit/<int:id>', methods=['POST'])
+@login_required
+@permission_required('production')
+def edit_packaging_component(id):
+    component = ProductPackaging.query.get_or_404(id)
+    component.quantity_required = request.form.get('quantity', type=int)
+    db.session.commit()
+    flash("Zaktualizowano ilość opakowania.", "success")
+    return redirect(url_for('production.manage_packaging_bill', product_id=component.finished_product_id))
+
+@bp.route('/packaging_bill/delete/<int:id>', methods=['POST'])
+@login_required
+@permission_required('production')
+def delete_packaging_component(id):
+    component = ProductPackaging.query.get_or_404(id)
+    product_id = component.finished_product_id
+    db.session.delete(component)
+    db.session.commit()
+    flash("Usunięto opakowanie ze specyfikacji.", "danger")
+    return redirect(url_for('production.manage_packaging_bill', product_id=product_id))

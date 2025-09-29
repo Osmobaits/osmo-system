@@ -91,13 +91,11 @@
                 <table class="table table-striped table-hover">
                     <thead>
                         <tr>
-                            {# === POCZĄTEK ZMIANY: DODANIE "_anchor" DO LINKÓW === #}
                             {% set anchor_id = 'category-' + category.name|lower|replace(' ', '-') %}
                             <th><a href="{{ url_for('warehouse.index', sort_by='received_date', order='asc' if sort_by == 'received_date' and order == 'desc' else 'desc', _anchor=anchor_id) }}">Data Przyjęcia {% if sort_by == 'received_date' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
                             <th><a href="{{ url_for('warehouse.index', sort_by='name', order='asc' if sort_by == 'name' and order == 'desc' else 'desc', _anchor=anchor_id) }}">Surowiec {% if sort_by == 'name' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
                             <th><a href="{{ url_for('warehouse.index', sort_by='batch_number', order='asc' if sort_by == 'batch_number' and order == 'desc' else 'desc', _anchor=anchor_id) }}">Numer Partii {% if sort_by == 'batch_number' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
                             <th><a href="{{ url_for('warehouse.index', sort_by='quantity', order='asc' if sort_by == 'quantity' and order == 'desc' else 'desc', _anchor=anchor_id) }}">Ilość na stanie {% if sort_by == 'quantity' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
-                            {# === KONIEC ZMIANY === #}
                             <th>Jednostka</th>
                             <th class="text-end">Akcje</th>
                         </tr>

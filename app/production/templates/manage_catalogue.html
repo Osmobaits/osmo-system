@@ -41,15 +41,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Opakowanie (opcjonalnie)</label>
-                            <select name="packaging_id" class="form-select">
-                                <option value="">-- Brak opakowania --</option>
-                                {% for pkg in all_packaging %}
-                                    <option value="{{ pkg.id }}">{{ pkg.name }} (na stanie: {{ pkg.quantity_in_stock }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         <button type="submit" class="btn btn-primary">Dodaj produkt</button>
                     </form>
                 </div>
@@ -75,30 +66,25 @@
                              <div class="card-body">
                                 <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}">
                                     <div class="row g-2 align-items-end">
-                                        <div class="col-md-6"><label class="form-label small">Nazwa</label><input type="text" class="form-control form-control-sm" name="name" value="{{ product.name }}"></div>
-                                        <div class="col-md-3"><label class="form-label small">Kod</label><input type="text" class="form-control form-control-sm" name="product_code" value="{{ product.product_code or '' }}"></div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-8"><label class="form-label small">Nazwa</label><input type="text" class="form-control form-control-sm" name="name" value="{{ product.name }}"></div>
+                                        <div class="col-md-4"><label class="form-label small">Kod</label><input type="text" class="form-control form-control-sm" name="product_code" value="{{ product.product_code or '' }}"></div>
+                                        <div class="col-md-4">
                                             <label class="form-label small">Waga</label>
                                             <div class="input-group input-group-sm">
                                                 <input type="number" step="0.001" class="form-control" name="packaging_weight" value="{{ product.packaging_weight_kg }}">
                                                 <span class="input-group-text">kg</span>
                                             </div>
                                         </div>
-                                        <div class="col-md-6"><label class="form-label small">Kategoria</label>
+                                        <div class="col-md-8"><label class="form-label small">Kategoria</label>
                                             <select name="category_id" class="form-select form-select-sm" required>
                                                 {% for cat in categories %}<option value="{{ cat.id }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6"><label class="form-label small">Opakowanie</label>
-                                            <select name="packaging_id" class="form-select form-select-sm">
-                                                <option value="">-- Brak --</option>
-                                                {% for pkg in all_packaging %}<option value="{{ pkg.id }}" {% if product.packaging_id == pkg.id %}selected{% endif %}>{{ pkg.name }}</option>{% endfor %}
                                             </select>
                                         </div>
                                     </div>
                                     <div class="row g-2 mt-2">
                                         <div class="col-12 text-end">
                                             <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                            <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm">Opakowania</a>
                                             <button type="submit" class="btn btn-success btn-sm">Zapisz</button>
                                             <a href="#" class="btn btn-danger btn-sm" onclick="event.preventDefault(); document.getElementById('delete-form-{{ product.id }}').submit();">Usuń</a>
                                             <form id="delete-form-{{ product.id }}" method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:none;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');"></form>
