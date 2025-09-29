@@ -65,73 +65,62 @@
         </div>
     </div>
     
-    <div class="card shadow-sm mb-4">
-        <div class="card-header">
-            <h3>Partie na stanie</h3>
-        </div>
+    <div class="card shadow-sm">
+        <div class="card-header"><h3>Partie na stanie</h3></div>
         <div class="card-body">
-            <strong>Szybka nawigacja:</strong>
-            {% for category in categories if category.raw_materials %}
-                <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
-            {% endfor %}
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        {# === POCZĄTEK ZMIANY: INTERAKTYWNE NAGŁÓWKI === #}
+                        <th>
+                            <a href="{{ url_for('warehouse.index', sort_by='received_date', order='asc' if sort_by == 'received_date' and order == 'desc' else 'desc') }}">
+                                Data Przyjęcia {% if sort_by == 'received_date' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                             <a href="{{ url_for('warehouse.index', sort_by='name', order='asc' if sort_by == 'name' and order == 'desc' else 'desc') }}">
+                                Surowiec {% if sort_by == 'name' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                             <a href="{{ url_for('warehouse.index', sort_by='batch_number', order='asc' if sort_by == 'batch_number' and order == 'desc' else 'desc') }}">
+                                Numer Partii {% if sort_by == 'batch_number' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                             <a href="{{ url_for('warehouse.index', sort_by='quantity', order='asc' if sort_by == 'quantity' and order == 'desc' else 'desc') }}">
+                                Ilość na stanie {% if sort_by == 'quantity' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>Jednostka</th>
+                        <th class="text-end">Akcje</th>
+                        {# === KONIEC ZMIANY === #}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    {% set material = batch.material %}
+                    {% set current_stock = total_stocks.get(material.id, 0) %}
+                    <tr class="{{ 'table-warning' if material.critical_stock_level > 0 and current_stock < material.critical_stock_level }}">
+                        <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
+                        <td>{{ material.name }}</td>
+                        <td>{{ batch.batch_number }}</td>
+                        <td>{{ "%.2f"|format(batch.quantity_on_hand) }}</td>
+                        <td>{{ batch.unit }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('warehouse.edit_batch', id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
+                            <form method="POST" action="{{ url_for('warehouse.delete_batch', id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć tę partię?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Brak partii w magazynie.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-    
-    {% for category in categories if category.raw_materials %}
-        <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
-            <div class="card-header bg-light">
-                <h4>{{ category.name }}</h4>
-            </div>
-            <div class="card-body">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Data Przyjęcia</th>
-                            <th>Surowiec</th>
-                            <th>Numer Partii</th>
-                            <th>Ilość na stanie</th>
-                            <th>Jednostka</th>
-                            <th class="text-end">Akcje</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set batches_in_category = batches | selectattr('material.category.name', 'equalto', category.name) | list %}
-                        {% for batch in batches_in_category %}
-                        {% set material = batch.material %}
-                        {% set current_stock = total_stocks.get(material.id, 0) %}
-                        <tr class="{{ 'table-warning' if material.critical_stock_level > 0 and current_stock < material.critical_stock_level }}">
-                            <td>{{ batch.received_date.strftime('%Y-%m-%d') if batch.received_date }}</td>
-                            <td>{{ material.name }}</td>
-                            <td>{{ batch.batch_number }}</td>
-                            <td>{{ batch.quantity_on_hand }}</td>
-                            <td>{{ batch.unit }}</td>
-                            <td class="text-end">
-                                <a href="{{ url_for('warehouse.edit_batch', id=batch.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
-                                <form method="POST" action="{{ url_for('warehouse.delete_batch', id=batch.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć tę partię?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if not batches_in_category %}
-                        <tr>
-                            <td colspan="6" class="text-center">Brak partii w tej kategorii.</td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-                <div class="text-end mt-2">
-                    <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
-                </div>
-            </div>
-        </div>
-    {% endfor %}
-
-    {% if not batches %}
-        <div class="card shadow-sm">
-            <div class="card-body text-center">
-                <p class="mb-0">Brak jakichkolwiek partii w magazynie.</p>
-            </div>
-        </div>
-    {% endif %}
 {% endblock %}
