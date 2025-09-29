@@ -44,10 +44,16 @@ def manage_catalogue():
             flash(f"Dodano produkt '{name}' do katalogu.", "success")
         return redirect(url_for('production.manage_catalogue'))
     
-    products = FinishedProduct.query.order_by(FinishedProduct.name).all()
-    categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
+    # === POCZĄTEK ZMIANY ===
+    # Pobieramy kategorie razem z przypisanymi produktami
+    from sqlalchemy.orm import joinedload
+    categories = FinishedProductCategory.query.options(
+        joinedload(FinishedProductCategory.finished_products)
+    ).order_by(FinishedProductCategory.name).all()
     all_packaging = Packaging.query.order_by(Packaging.name).all()
-    return render_template('manage_catalogue.html', products=products, categories=categories, all_packaging=all_packaging)
+    # === KONIEC ZMIANY ===
+    
+    return render_template('manage_catalogue.html', categories=categories, all_packaging=all_packaging)
 
 @bp.route('/catalogue/check_code')
 @login_required
@@ -260,10 +266,8 @@ def edit_batch(order_id):
                 product = order.finished_product
                 product.quantity_in_stock += quantity_difference
 
-                # === POCZĄTEK ZMIANY: ZARZĄDZANIE STANEM OPAKOWAŃ ===
                 if product.packaging:
                     product.packaging.quantity_in_stock -= quantity_difference
-                # === KONIEC ZMIANY ===
 
             order.quantity_produced = new_produced_quantity
             
@@ -285,20 +289,16 @@ def delete_batch(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
     
     try:
-        # Zwracanie surowców
         for log in order.consumption_log:
             batch = RawMaterialBatch.query.get(log.raw_material_batch_id)
             if batch:
                 batch.quantity_on_hand += log.quantity_consumed
         
         product = order.finished_product
-        # Zwrot produktu gotowego
         product.quantity_in_stock -= order.quantity_produced
         
-        # === POCZĄTEK ZMIANY: ZWROT OPAKOWAŃ ===
         if product.packaging:
             product.packaging.quantity_in_stock += order.quantity_produced
-        # === KONIEC ZMIANY ===
         
         ProductionLog.query.filter_by(production_order_id=order_id).delete()
         db.session.delete(order)

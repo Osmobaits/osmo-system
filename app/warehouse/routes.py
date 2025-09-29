@@ -111,9 +111,15 @@ def manage_catalogue():
         
         return redirect(url_for('warehouse.manage_catalogue'))
     
-    materials = RawMaterial.query.order_by(RawMaterial.name).all()
-    categories = Category.query.order_by(Category.name).all()
-    return render_template('manage_raw_materials_catalogue.html', materials=materials, categories=categories)
+    # === POCZĄTEK ZMIANY ===
+    # Pobieramy kategorie razem z przypisanymi surowcami
+    categories = Category.query.options(
+        joinedload(Category.raw_materials)
+    ).order_by(Category.name).all()
+    # === KONIEC ZMIANY ===
+    
+    return render_template('manage_raw_materials_catalogue.html', categories=categories)
+
 
 @bp.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -176,7 +182,10 @@ def edit_category(id):
 @permission_required('warehouse')
 def delete_category(id):
     category = Category.query.get_or_404(id)
-    db.session.delete(category)
-    db.session.commit()
-    flash(f"Kategoria '{category.name}' oraz powiązane z nią surowce zostały usunięte.", "danger")
+    if category.raw_materials:
+        flash(f"Nie można usunąć kategorii '{category.name}', ponieważ są do niej przypisane surowce.", "danger")
+    else:
+        db.session.delete(category)
+        db.session.commit()
+        flash(f"Kategoria '{category.name}' została usunięta.", "danger")
     return redirect(url_for('warehouse.manage_categories'))

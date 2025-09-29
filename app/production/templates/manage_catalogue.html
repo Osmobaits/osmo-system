@@ -2,7 +2,7 @@
 {% block title %}Katalog Produktów Gotowych{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Katalog Produktów Gotowych</h1>
         <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Powrót do Historii Produkcji</a>
     </div>
@@ -11,87 +11,114 @@
       {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
-    <div class="card shadow-sm mb-5">
-        <div class="card-header"><h3>Dodaj nowy produkt do katalogu</h3></div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('production.manage_catalogue') }}">
-                <div class="row g-2 mb-2">
-                    <div class="col-md-4"><label class="form-label">Nazwa produktu</label><input type="text" class="form-control" name="name" required></div>
-                    <div class="col-md-2"><label class="form-label">Kod produktu</label><input type="text" class="form-control" name="product_code"></div>
-                    <div class="col-md-2">
-                        <label class="form-label">Waga opak.</label>
-                        <div class="input-group">
-                            <input type="number" step="0.001" class="form-control" name="packaging_weight" required>
-                            <span class="input-group-text">kg</span>
-                        </div>
-                    </div>
-                    <div class="col-md-4"><label class="form-label">Kategoria</label>
-                        <select name="category_id" class="form-select" required>
-                            <option value="">Wybierz...</option>
-                            {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="row g-2">
-                    <div class="col-md-12">
-                        <label class="form-label">Opakowanie (opcjonalnie)</label>
-                        <select name="packaging_id" class="form-select">
-                            <option value="">-- Brak opakowania --</option>
-                            {% for pkg in all_packaging %}
-                                <option value="{{ pkg.id }}">{{ pkg.name }} (na stanie: {{ pkg.quantity_in_stock }})</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary mt-3">Dodaj produkt</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header"><h3>Istniejące produkty w katalogu</h3></div>
-        <div class="card-body">
-            {% for product in products %}
-            <div class="card mb-3">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h3>Dodaj nowy produkt do katalogu</h3></div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-3"><label class="form-label">Nazwa</label><input type="text" class="form-control" name="name" value="{{ product.name }}"></div>
-                            <div class="col-md-1"><label class="form-label">Kod</label><input type="text" class="form-control" name="product_code" value="{{ product.product_code or '' }}"></div>
-                            <div class="col-md-2">
-                                <label class="form-label">Waga</label>
-                                <div class="input-group">
-                                    <input type="number" step="0.001" class="form-control" name="packaging_weight" value="{{ product.packaging_weight_kg }}">
-                                    <span class="input-group-text">kg</span>
-                                </div>
-                            </div>
-                            <div class="col-md-3"><label class="form-label">Kategoria</label>
-                                <select name="category_id" class="form-select" required>
-                                    {% for category in categories %}<option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>{% endfor %}
-                                </select>
-                            </div>
-                             <div class="col-md-3"><label class="form-label">Opakowanie</label>
-                                <select name="packaging_id" class="form-select">
-                                    <option value="">-- Brak opakowania --</option>
-                                    {% for pkg in all_packaging %}<option value="{{ pkg.id }}" {% if product.packaging_id == pkg.id %}selected{% endif %}>{{ pkg.name }}</option>{% endfor %}
-                                </select>
-                            </div>
-                             </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-12 text-end">
-                                <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info">Receptura</a>
-                                <button type="submit" class="btn btn-success">Zapisz</button>
-                                <a href="#" class="btn btn-danger" onclick="event.preventDefault(); document.getElementById('delete-form-{{ product.id }}').submit();">Usuń</a>
-                                <form id="delete-form-{{ product.id }}" method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:none;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');"></form>
+                    <form method="POST" action="{{ url_for('production.manage_catalogue') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Nazwa produktu</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kod produktu</label>
+                            <input type="text" class="form-control" name="product_code">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Waga opak.</label>
+                            <div class="input-group">
+                                <input type="number" step="0.001" class="form-control" name="packaging_weight" required>
+                                <span class="input-group-text">kg</span>
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kategoria</label>
+                            <select name="category_id" class="form-select" required>
+                                <option value="">Wybierz...</option>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Opakowanie (opcjonalnie)</label>
+                            <select name="packaging_id" class="form-select">
+                                <option value="">-- Brak opakowania --</option>
+                                {% for pkg in all_packaging %}
+                                    <option value="{{ pkg.id }}">{{ pkg.name }} (na stanie: {{ pkg.quantity_in_stock }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Dodaj produkt</button>
                     </form>
                 </div>
             </div>
+            <div class="card shadow-sm">
+                <div class="card-header"><h3>Szybka nawigacja</h3></div>
+                <div class="card-body">
+                    {% for category in categories if category.finished_products %}
+                        <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            {% for category in categories if category.finished_products %}
+                <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h4>{{ category.name }}</h4>
+                    </div>
+                    <div class="card-body">
+                        {% for product in category.finished_products %}
+                        <div class="card mb-2">
+                             <div class="card-body">
+                                <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-6"><label class="form-label small">Nazwa</label><input type="text" class="form-control form-control-sm" name="name" value="{{ product.name }}"></div>
+                                        <div class="col-md-3"><label class="form-label small">Kod</label><input type="text" class="form-control form-control-sm" name="product_code" value="{{ product.product_code or '' }}"></div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Waga</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" step="0.001" class="form-control" name="packaging_weight" value="{{ product.packaging_weight_kg }}">
+                                                <span class="input-group-text">kg</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6"><label class="form-label small">Kategoria</label>
+                                            <select name="category_id" class="form-select form-select-sm" required>
+                                                {% for cat in categories %}<option value="{{ cat.id }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6"><label class="form-label small">Opakowanie</label>
+                                            <select name="packaging_id" class="form-select form-select-sm">
+                                                <option value="">-- Brak --</option>
+                                                {% for pkg in all_packaging %}<option value="{{ pkg.id }}" {% if product.packaging_id == pkg.id %}selected{% endif %}>{{ pkg.name }}</option>{% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-12 text-end">
+                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                            <button type="submit" class="btn btn-success btn-sm">Zapisz</button>
+                                            <a href="#" class="btn btn-danger btn-sm" onclick="event.preventDefault(); document.getElementById('delete-form-{{ product.id }}').submit();">Usuń</a>
+                                            <form id="delete-form-{{ product.id }}" method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:none;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');"></form>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                         <div class="text-end mt-2">
+                            <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
+                        </div>
+                    </div>
+                </div>
             {% else %}
-            <p class="text-center">Brak produktów w katalogu.</p>
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <p>Katalog jest pusty. Zdefiniuj pierwszy produkt i kategorię, aby je tu zobaczyć.</p>
+                    </div>
+                </div>
             {% endfor %}
         </div>
     </div>

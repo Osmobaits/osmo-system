@@ -2,7 +2,7 @@
 {% block title %}Katalog Surowców{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Katalog Surowców</h1>
         <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">Powrót do Zarządzania Partiami</a>
     </div>
@@ -13,7 +13,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="card shadow-sm mb-3">
+            <div class="card shadow-sm mb-4">
                 <div class="card-header"><h3>Dodaj nowy surowiec do katalogu</h3></div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('warehouse.manage_catalogue') }}">
@@ -34,33 +34,47 @@
                     </form>
                 </div>
             </div>
-        </div>
-        <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header"><h3>Istniejące surowce w katalogu</h3></div>
+                <div class="card-header"><h3>Szybka nawigacja</h3></div>
                 <div class="card-body">
-                    {# === POCZĄTEK ZMIANY: INTERAKTYWNA LISTA === #}
-                    <ul class="list-group">
-                        {% for material in materials %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="fw-bold">{{ material.name }}</span>
-                                <small class="text-muted d-block">Kategoria: {{ material.category.name }}</small>
-                            </div>
-                            <div>
-                                <a href="{{ url_for('warehouse.edit_material', id=material.id) }}" class="btn btn-info btn-sm">Edytuj</a>
-                                <form method="POST" action="{{ url_for('warehouse.delete_material', id=material.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz trwale usunąć ten surowiec z katalogu?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                                </form>
-                            </div>
-                        </li>
-                        {% else %}
-                        <li class="list-group-item">Katalog jest pusty. Zdefiniuj pierwszy surowiec.</li>
-                        {% endfor %}
-                    </ul>
-                    {# === KONIEC ZMIANY === #}
+                    {% for category in categories if category.raw_materials %}
+                        <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
+                    {% endfor %}
                 </div>
             </div>
+        </div>
+        <div class="col-md-8">
+            {% for category in categories if category.raw_materials %}
+                <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h4>{{ category.name }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            {% for material in category.raw_materials %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ material.name }}
+                                <div>
+                                    <a href="{{ url_for('warehouse.edit_material', id=material.id) }}" class="btn btn-info btn-sm">Edytuj</a>
+                                    <form method="POST" action="{{ url_for('warehouse.delete_material', id=material.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz trwale usunąć ten surowiec z katalogu?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                    </form>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                         <div class="text-end mt-2">
+                            <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <p>Katalog jest pusty. Zdefiniuj pierwszy surowiec i kategorię, aby je tu zobaczyć.</p>
+                    </div>
+                </div>
+            {% endfor %}
         </div>
     </div>
 {% endblock %}
