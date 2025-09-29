@@ -5,7 +5,7 @@ from flask_login import login_required
 from app.decorators import permission_required
 from datetime import date, datetime
 from sqlalchemy.orm import joinedload
-from sqlalchemy import asc, desc # <-- NOWY IMPORT
+from sqlalchemy import asc, desc
 
 bp = Blueprint('warehouse', __name__, template_folder='templates', url_prefix='/warehouse')
 
@@ -45,7 +45,6 @@ def index():
         'batch_number': RawMaterialBatch.batch_number,
         'quantity': RawMaterialBatch.quantity_on_hand,
     }
-
     sort_column = sort_map.get(sort_by, RawMaterialBatch.received_date)
     
     if order == 'asc':
@@ -55,11 +54,12 @@ def index():
         
     all_batches = query.all()
     # === KONIEC ZMIANY ===
-
+    
     categories = Category.query.options(joinedload(Category.raw_materials)).order_by(Category.name).all()
 
     total_stocks = {}
-    for batch in all_batches:
+    # Obliczamy sumy na podstawie wszystkich partii, a nie tylko posortowanych
+    for batch in RawMaterialBatch.query.all():
         total_stocks[batch.raw_material_id] = total_stocks.get(batch.raw_material_id, 0) + batch.quantity_on_hand
 
     low_stock_materials = []
@@ -75,8 +75,8 @@ def index():
                            batches=all_batches, 
                            low_stock_materials=low_stock_materials,
                            total_stocks=total_stocks,
-                           sort_by=sort_by, # Przekazanie do szablonu
-                           order=order) # Przekazanie do szablonu
+                           sort_by=sort_by,
+                           order=order)
 
 
 @bp.route('/batch/edit/<int:id>', methods=['GET', 'POST'])
@@ -136,12 +136,9 @@ def manage_catalogue():
         
         return redirect(url_for('warehouse.manage_catalogue'))
     
-    # === POCZĄTEK ZMIANY ===
-    # Pobieramy kategorie razem z przypisanymi surowcami
     categories = Category.query.options(
         joinedload(Category.raw_materials)
     ).order_by(Category.name).all()
-    # === KONIEC ZMIANY ===
     
     return render_template('manage_raw_materials_catalogue.html', categories=categories)
 
