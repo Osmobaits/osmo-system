@@ -99,8 +99,17 @@ class Packaging(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('packaging_categories.id'), nullable=True)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     critical_stock_level = db.Column(db.Integer, nullable=False, default=0)
-    products = db.relationship('FinishedProduct', backref='packaging', lazy=True)
+    products = db.relationship('ProductPackaging', back_populates='packaging')
     __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_name'),)
+
+class ProductPackaging(db.Model):
+    __tablename__ = 'product_packaging'
+    id = db.Column(db.Integer, primary_key=True)
+    finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
+    packaging_id = db.Column(db.Integer, db.ForeignKey('packaging.id'), nullable=False)
+    quantity_required = db.Column(db.Integer, nullable=False, default=1)
+    product = db.relationship('FinishedProduct', back_populates='packaging_bill')
+    packaging = db.relationship('Packaging', back_populates='products')
 
 class FinishedProduct(db.Model):
     __tablename__ = 'finished_products'
@@ -108,10 +117,9 @@ class FinishedProduct(db.Model):
     name = db.Column(db.String(150), unique=True, nullable=False)
     product_code = db.Column(db.String(50), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('finished_product_categories.id'), nullable=True)
-    packaging_id = db.Column(db.Integer, db.ForeignKey('packaging.id'), nullable=True)
     packaging_weight_kg = db.Column(db.Float, nullable=False, default=1.0)
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
-    recipe_components = db.relationship('RecipeComponent', backref='finished_product', lazy=True, cascade="all, delete-orphan")
+    recipe_components = db.relationship('RecipeComponent', foreign_keys='RecipeComponent.finished_product_id', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
     packaging_bill = db.relationship('ProductPackaging', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
 
@@ -119,9 +127,18 @@ class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
     id = db.Column(db.Integer, primary_key=True)
     finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
-    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=True)
+    sub_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=True)
     quantity_required = db.Column(db.Float, nullable=False)
-    raw_material = db.relationship('RawMaterial', lazy=True)
+    product = db.relationship('FinishedProduct', foreign_keys=[finished_product_id], back_populates='recipe_components')
+    raw_material = db.relationship('RawMaterial')
+    sub_product = db.relationship('FinishedProduct', foreign_keys=[sub_product_id])
+    __table_args__ = (
+        db.CheckConstraint(
+            '(raw_material_id IS NOT NULL AND sub_product_id IS NULL) OR (raw_material_id IS NULL AND sub_product_id IS NOT NULL)',
+            name='chk_recipe_component_type'
+        ),
+    )
 
 class ProductionOrder(db.Model):
     __tablename__ = 'production_orders'
@@ -132,7 +149,7 @@ class ProductionOrder(db.Model):
     order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     sample_required = db.Column(db.Boolean, nullable=False, default=False)
     finished_product = db.relationship('FinishedProduct', back_populates='production_orders')
-    consumption_log = db.relationship('ProductionLog', backref='production_order', lazy=True, cascade="all, delete-orphan")
+    consumption_log = db.relationship('ProductionLog', foreign_keys='ProductionLog.production_order_id', backref='production_order', lazy=True, cascade="all, delete-orphan")
     @property
     def production_date(self):
         return self.order_date.date()
@@ -141,9 +158,11 @@ class ProductionLog(db.Model):
     __tablename__ = 'production_logs'
     id = db.Column(db.Integer, primary_key=True)
     production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'), nullable=False)
-    raw_material_batch_id = db.Column(db.Integer, db.ForeignKey('raw_material_batches.id'), nullable=False)
+    raw_material_batch_id = db.Column(db.Integer, db.ForeignKey('raw_material_batches.id'), nullable=True)
+    sub_product_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'), nullable=True)
     quantity_consumed = db.Column(db.Float, nullable=False)
     batch = db.relationship('RawMaterialBatch', lazy=True)
+    consumed_from_order = db.relationship('ProductionOrder', foreign_keys=[sub_product_order_id])
 
 class Client(db.Model):
     __tablename__ = 'clients'
@@ -188,15 +207,6 @@ class VacationRequest(db.Model):
     admin_notes = db.Column(db.Text, nullable=True)
     user = db.relationship('User', backref='vacation_requests')
 
-class ProductPackaging(db.Model):
-    __tablename__ = 'product_packaging'
-    id = db.Column(db.Integer, primary_key=True)
-    finished_product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
-    packaging_id = db.Column(db.Integer, db.ForeignKey('packaging.id'), nullable=False)
-    quantity_required = db.Column(db.Integer, nullable=False, default=1)
-    product = db.relationship('FinishedProduct', back_populates='packaging_bill')
-    packaging = db.relationship('Packaging')
-
 class SalesReportLog(db.Model):
     __tablename__ = 'sales_report_logs'
     id = db.Column(db.Integer, primary_key=True)
@@ -204,5 +214,3 @@ class SalesReportLog(db.Model):
     report_date = db.Column(db.Date, nullable=False)
     quantity_sold = db.Column(db.Integer, nullable=False)
     product = db.relationship('FinishedProduct')
-
-Packaging.products = db.relationship('ProductPackaging', back_populates='packaging')

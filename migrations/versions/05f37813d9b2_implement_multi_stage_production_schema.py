@@ -1,8 +1,8 @@
-"""Initial migration
+"""Implement multi-stage production schema
 
-Revision ID: 940589aeaed3
+Revision ID: 05f37813d9b2
 Revises: 
-Create Date: 2025-09-16 11:21:26.695124
+Create Date: 2025-09-30 16:47:03.565972
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '940589aeaed3'
+revision = '05f37813d9b2'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -64,6 +64,17 @@ def upgrade():
     sa.ForeignKeyConstraint(['client_id'], ['clients.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('finished_products',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=150), nullable=False),
+    sa.Column('product_code', sa.String(length=50), nullable=True),
+    sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.Column('packaging_weight_kg', sa.Float(), nullable=False),
+    sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['category_id'], ['finished_product_categories.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
     op.create_table('orders',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.Integer(), nullable=False),
@@ -78,6 +89,7 @@ def upgrade():
     sa.Column('name', sa.String(length=150), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=True),
     sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
+    sa.Column('critical_stock_level', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['packaging_categories.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name', name='uq_packaging_name')
@@ -122,19 +134,6 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('finished_products',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(length=150), nullable=False),
-    sa.Column('product_code', sa.String(length=50), nullable=True),
-    sa.Column('category_id', sa.Integer(), nullable=True),
-    sa.Column('packaging_id', sa.Integer(), nullable=True),
-    sa.Column('packaging_weight_kg', sa.Float(), nullable=False),
-    sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['category_id'], ['finished_product_categories.id'], ),
-    sa.ForeignKeyConstraint(['packaging_id'], ['packaging.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('name')
-    )
     op.create_table('order_products',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
@@ -145,6 +144,25 @@ def upgrade():
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('product_packaging',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('finished_product_id', sa.Integer(), nullable=False),
+    sa.Column('packaging_id', sa.Integer(), nullable=False),
+    sa.Column('quantity_required', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
+    sa.ForeignKeyConstraint(['packaging_id'], ['packaging.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('production_orders',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('finished_product_id', sa.Integer(), nullable=False),
+    sa.Column('planned_quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity_produced', sa.Integer(), nullable=False),
+    sa.Column('order_date', sa.DateTime(), nullable=False),
+    sa.Column('sample_required', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('raw_material_batches',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('raw_material_id', sa.Integer(), nullable=False),
@@ -153,6 +171,26 @@ def upgrade():
     sa.Column('unit', sa.String(length=20), nullable=False),
     sa.Column('received_date', sa.Date(), nullable=False),
     sa.ForeignKeyConstraint(['raw_material_id'], ['raw_materials.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('recipe_components',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('finished_product_id', sa.Integer(), nullable=False),
+    sa.Column('raw_material_id', sa.Integer(), nullable=True),
+    sa.Column('sub_product_id', sa.Integer(), nullable=True),
+    sa.Column('quantity_required', sa.Float(), nullable=False),
+    sa.CheckConstraint('(raw_material_id IS NOT NULL AND sub_product_id IS NULL) OR (raw_material_id IS NULL AND sub_product_id IS NOT NULL)', name='chk_recipe_component_type'),
+    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
+    sa.ForeignKeyConstraint(['raw_material_id'], ['raw_materials.id'], ),
+    sa.ForeignKeyConstraint(['sub_product_id'], ['finished_products.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('sales_report_logs',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('report_date', sa.Date(), nullable=False),
+    sa.Column('quantity_sold', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['product_id'], ['finished_products.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('task_assignees',
@@ -170,32 +208,15 @@ def upgrade():
     sa.ForeignKeyConstraint(['task_id'], ['tasks.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('production_orders',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('finished_product_id', sa.Integer(), nullable=False),
-    sa.Column('planned_quantity', sa.Integer(), nullable=False),
-    sa.Column('quantity_produced', sa.Integer(), nullable=False),
-    sa.Column('order_date', sa.DateTime(), nullable=False),
-    sa.Column('sample_required', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('recipe_components',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('finished_product_id', sa.Integer(), nullable=False),
-    sa.Column('raw_material_id', sa.Integer(), nullable=False),
-    sa.Column('quantity_required', sa.Float(), nullable=False),
-    sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
-    sa.ForeignKeyConstraint(['raw_material_id'], ['raw_materials.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('production_logs',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('production_order_id', sa.Integer(), nullable=False),
-    sa.Column('raw_material_batch_id', sa.Integer(), nullable=False),
+    sa.Column('raw_material_batch_id', sa.Integer(), nullable=True),
+    sa.Column('sub_product_order_id', sa.Integer(), nullable=True),
     sa.Column('quantity_consumed', sa.Float(), nullable=False),
     sa.ForeignKeyConstraint(['production_order_id'], ['production_orders.id'], ),
     sa.ForeignKeyConstraint(['raw_material_batch_id'], ['raw_material_batches.id'], ),
+    sa.ForeignKeyConstraint(['sub_product_order_id'], ['production_orders.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
@@ -204,19 +225,21 @@ def upgrade():
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('production_logs')
-    op.drop_table('recipe_components')
-    op.drop_table('production_orders')
     op.drop_table('task_attachments')
     op.drop_table('task_assignees')
+    op.drop_table('sales_report_logs')
+    op.drop_table('recipe_components')
     op.drop_table('raw_material_batches')
+    op.drop_table('production_orders')
+    op.drop_table('product_packaging')
     op.drop_table('order_products')
-    op.drop_table('finished_products')
     op.drop_table('vacation_requests')
     op.drop_table('user_roles')
     op.drop_table('tasks')
     op.drop_table('raw_materials')
     op.drop_table('packaging')
     op.drop_table('orders')
+    op.drop_table('finished_products')
     op.drop_table('client_products')
     op.drop_table('users')
     op.drop_table('roles')
