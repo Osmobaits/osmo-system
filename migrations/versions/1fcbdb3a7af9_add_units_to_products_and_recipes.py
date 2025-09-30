@@ -1,8 +1,8 @@
-"""Implement multi-stage production schema
+"""Add units to products and recipes
 
-Revision ID: 05f37813d9b2
+Revision ID: 1fcbdb3a7af9
 Revises: 
-Create Date: 2025-09-30 16:47:03.565972
+Create Date: 2025-09-30 20:24:23.914012
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '05f37813d9b2'
+revision = '1fcbdb3a7af9'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -70,6 +70,7 @@ def upgrade():
     sa.Column('product_code', sa.String(length=50), nullable=True),
     sa.Column('category_id', sa.Integer(), nullable=True),
     sa.Column('packaging_weight_kg', sa.Float(), nullable=False),
+    sa.Column('unit', sa.String(length=10), server_default='szt.', nullable=False),
     sa.Column('quantity_in_stock', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['finished_product_categories.id'], ),
     sa.PrimaryKeyConstraint('id'),
@@ -179,6 +180,7 @@ def upgrade():
     sa.Column('raw_material_id', sa.Integer(), nullable=True),
     sa.Column('sub_product_id', sa.Integer(), nullable=True),
     sa.Column('quantity_required', sa.Float(), nullable=False),
+    sa.Column('unit', sa.String(length=10), server_default='kg', nullable=False),
     sa.CheckConstraint('(raw_material_id IS NOT NULL AND sub_product_id IS NULL) OR (raw_material_id IS NULL AND sub_product_id IS NOT NULL)', name='chk_recipe_component_type'),
     sa.ForeignKeyConstraint(['finished_product_id'], ['finished_products.id'], ),
     sa.ForeignKeyConstraint(['raw_material_id'], ['raw_materials.id'], ),

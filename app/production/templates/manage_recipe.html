@@ -15,15 +15,15 @@
         <div class="card-header"><h3>Dodaj składnik do receptury</h3></div>
         <div class="card-body">
             <form method="POST">
-                <div class="row">
-                    <div class="col-md-3 mb-3">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
                         <label class="form-label">Typ składnika</label>
                         <select id="component-type-select" name="component_type" class="form-select" required>
                             <option value="raw_material">Surowiec</option>
                             <option value="sub_product">Półprodukt</option>
                         </select>
                     </div>
-                    <div class="col-md-5 mb-3" id="raw-material-selector">
+                    <div class="col-md-4" id="raw-material-selector">
                         <label class="form-label">Surowiec</label>
                         <select class="form-select" name="raw_material_id">
                             <option value="">Wybierz surowiec...</option>
@@ -32,7 +32,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-5 mb-3" id="sub-product-selector" style="display: none;">
+                    <div class="col-md-4" id="sub-product-selector" style="display: none;">
                         <label class="form-label">Półprodukt</label>
                         <select class="form-select" name="sub_product_id">
                             <option value="">Wybierz półprodukt...</option>
@@ -41,11 +41,19 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2 mb-3">
-                        <label class="form-label">Ilość (kg/szt.)</label>
-                        <input type="number" step="0.001" class="form-control" name="quantity" required>
+                    <div class="col-md-3">
+                        <label class="form-label">Ilość</label>
+                        <div class="input-group">
+                            <input type="number" step="0.001" class="form-control" name="quantity" required>
+                            <select name="unit" class="form-select">
+                                <option value="kg">kg</option>
+                                <option value="g">g</option>
+                                <option value="ml">ml</option>
+                                <option value="szt.">szt.</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end mb-3">
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">Dodaj</button>
                     </div>
                 </div>
@@ -72,7 +80,12 @@
                         <form method="POST" action="{{ url_for('production.edit_recipe_component', id=component.id) }}" class="d-flex">
                             <div class="input-group input-group-sm">
                                 <input type="number" step="0.001" class="form-control" name="quantity" value="{{ component.quantity_required }}">
-                                <span class="input-group-text">{% if component.raw_material %}kg{% else %}szt.{% endif %}</span>
+                                <select name="unit" class="form-select">
+                                    <option value="kg" {% if component.unit == 'kg' %}selected{% endif %}>kg</option>
+                                    <option value="g" {% if component.unit == 'g' %}selected{% endif %}>g</option>
+                                    <option value="ml" {% if component.unit == 'ml' %}selected{% endif %}>ml</option>
+                                    <option value="szt." {% if component.unit == 'szt.' %}selected{% endif %}>szt.</option>
+                                </select>
                                 <button type="submit" class="btn btn-success ms-2">Zapisz</button>
                             </div>
                         </form>
@@ -102,7 +115,6 @@
                 document.querySelector('[name="sub_product_id"]').required = true;
             }
         });
-        // Ustawienie początkowe na wypadek przeładowania strony z błędem
         document.getElementById('component-type-select').dispatchEvent(new Event('change'));
     </script>
 {% endblock %}

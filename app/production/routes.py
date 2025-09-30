@@ -23,6 +23,7 @@ def manage_catalogue():
         name = request.form.get('name')
         product_code = request.form.get('product_code')
         packaging_weight = request.form.get('packaging_weight', type=float)
+        unit = request.form.get('unit')
         category_id = request.form.get('category_id', type=int)
         
         existing_by_name = FinishedProduct.query.filter_by(name=name).first()
@@ -30,12 +31,12 @@ def manage_catalogue():
             flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
             return redirect(url_for('production.manage_catalogue'))
 
-        # === ZMIANA: Usunięto obsługę 'packaging_id' ===
-        if name and packaging_weight and category_id:
+        if name and packaging_weight and category_id and unit:
             new_product = FinishedProduct(
                 name=name, 
                 product_code=product_code, 
                 packaging_weight_kg=packaging_weight, 
+                unit=unit,
                 category_id=category_id
             )
             db.session.add(new_product)
@@ -70,8 +71,8 @@ def edit_catalogue_product(id):
     product.name = request.form.get('name')
     product.product_code = request.form.get('product_code')
     product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
+    product.unit = request.form.get('unit')
     product.category_id = request.form.get('category_id', type=int)
-    # === ZMIANA: Usunięto obsługę 'packaging_id' ===
     db.session.commit()
     flash("Zapisano zmiany w produkcie.", "success")
     return redirect(url_for('production.manage_catalogue'))
@@ -82,7 +83,6 @@ def edit_catalogue_product(id):
 @permission_required('production')
 def delete_product(id):
     product = FinishedProduct.query.get_or_404(id)
-    # Sprawdzenie, czy produkt nie jest używany jako półprodukt w innej recepturze
     usage_in_recipe = RecipeComponent.query.filter_by(sub_product_id=id).first()
     if usage_in_recipe:
         flash(f"Nie można usunąć produktu '{product.name}', ponieważ jest on używany jako PÓŁPRODUKT w recepturze produktu '{usage_in_recipe.product.name}'.", "danger")
@@ -102,9 +102,10 @@ def manage_recipe(id):
     if request.method == 'POST':
         component_type = request.form.get('component_type')
         quantity = request.form.get('quantity', type=float)
+        unit = request.form.get('unit')
         
-        if not component_type or not quantity or quantity <= 0:
-            flash("Wybierz składnik i podaj prawidłową ilość.", "danger")
+        if not component_type or not quantity or quantity <= 0 or not unit:
+            flash("Wybierz składnik, jednostkę i podaj prawidłową ilość.", "danger")
             return redirect(url_for('production.manage_recipe', id=id))
 
         if component_type == 'raw_material':
@@ -117,7 +118,7 @@ def manage_recipe(id):
             if existing:
                 flash("Ten surowiec już jest w recepturze.", "warning")
             else:
-                new_component = RecipeComponent(finished_product_id=id, raw_material_id=raw_material_id, quantity_required=quantity)
+                new_component = RecipeComponent(finished_product_id=id, raw_material_id=raw_material_id, quantity_required=quantity, unit=unit)
                 db.session.add(new_component)
                 db.session.commit()
                 flash("Dodano surowiec do receptury.", "success")
@@ -132,7 +133,7 @@ def manage_recipe(id):
             if existing:
                 flash("Ten półprodukt już jest w recepturze.", "warning")
             else:
-                new_component = RecipeComponent(finished_product_id=id, sub_product_id=sub_product_id, quantity_required=quantity)
+                new_component = RecipeComponent(finished_product_id=id, sub_product_id=sub_product_id, quantity_required=quantity, unit=unit)
                 db.session.add(new_component)
                 db.session.commit()
                 flash("Dodano półprodukt do receptury.", "success")
@@ -150,20 +151,10 @@ def manage_recipe(id):
 def edit_recipe_component(id):
     component = RecipeComponent.query.get_or_404(id)
     component.quantity_required = request.form.get('quantity', type=float)
+    component.unit = request.form.get('unit')
     db.session.commit()
-    flash("Zaktualizowano ilość składnika.", "success")
+    flash("Zaktualizowano składnik w recepturze.", "success")
     return redirect(url_for('production.manage_recipe', id=component.finished_product_id))
-
-@bp.route('/recipe/delete/<int:id>', methods=['POST'])
-@login_required
-@permission_required('production')
-def delete_recipe_component(id):
-    component = RecipeComponent.query.get_or_404(id)
-    product_id = component.finished_product_id
-    db.session.delete(component)
-    db.session.commit()
-    flash("Usunięto składnik z receptury.", "danger")
-    return redirect(url_for('production.manage_recipe', id=product_id))
 
 
 @bp.route('/orders', methods=['GET', 'POST'])
@@ -235,7 +226,6 @@ def manage_production_orders():
             
             for item in sub_product_plan:
                 item['product'].quantity_in_stock -= item['quantity']
-                # TODO: Logika logowania zużycia półproduktów
                 
             db.session.commit()
             flash(f"Zlecenie na {planned_quantity} opakowań '{product.name}' zostało utworzone.", "success")
@@ -296,19 +286,16 @@ def delete_batch(order_id):
     order = ProductionOrder.query.get_or_404(order_id)
     
     try:
-        # Zwracanie surowców
+        # TODO: Logika zwrotu materiałów musi zostać rozbudowana o półprodukty
         for log in order.consumption_log:
             if log.raw_material_batch_id:
                 batch = RawMaterialBatch.query.get(log.raw_material_batch_id)
                 if batch:
                     batch.quantity_on_hand += log.quantity_consumed
-            # TODO: Logika zwrotu półproduktów
         
         product = order.finished_product
-        # Zwrot produktu gotowego
         product.quantity_in_stock -= order.quantity_produced
         
-        # Zwrot opakowań
         if product.packaging_bill:
             for item in product.packaging_bill:
                 if item.packaging:
