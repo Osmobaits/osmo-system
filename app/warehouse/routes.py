@@ -1,6 +1,6 @@
 # app/warehouse/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, RawMaterial, Category, RawMaterialBatch, ProductionLog
+from app.models import db, RawMaterial, Category, RawMaterialBatch, ProductionLog, RecipeComponent
 from flask_login import login_required
 from app.decorators import permission_required
 from datetime import date, datetime
@@ -33,7 +33,6 @@ def index():
             flash("Wszystkie pola są wymagane.", "warning")
         return redirect(url_for('warehouse.index'))
 
-    # === POCZĄTEK ZMIANY: LOGIKA SORTOWANIA ===
     sort_by = request.args.get('sort_by', 'received_date')
     order = request.args.get('order', 'desc')
 
@@ -53,12 +52,10 @@ def index():
         query = query.order_by(desc(sort_column))
         
     all_batches = query.all()
-    # === KONIEC ZMIANY ===
     
     categories = Category.query.options(joinedload(Category.raw_materials)).order_by(Category.name).all()
 
     total_stocks = {}
-    # Obliczamy sumy na podstawie wszystkich partii, a nie tylko posortowanych
     for batch in RawMaterialBatch.query.all():
         total_stocks[batch.raw_material_id] = total_stocks.get(batch.raw_material_id, 0) + batch.quantity_on_hand
 
@@ -158,15 +155,26 @@ def edit_material(id):
     all_categories = Category.query.order_by(Category.name).all()
     return render_template('edit_material.html', material=material_to_edit, categories=all_categories)
 
+# === POCZĄTEK ZMIANY: BEZPIECZNE USUWANIE ===
 @bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 @permission_required('warehouse')
 def delete_material(id):
     material_to_delete = RawMaterial.query.get_or_404(id)
-    db.session.delete(material_to_delete)
-    db.session.commit()
-    flash(f"Usunięto surowiec: {material_to_delete.name}", "danger")
+    
+    # Sprawdzenie, czy surowiec jest używany w jakiejkolwiek recepturze
+    usage_in_recipe = RecipeComponent.query.filter_by(raw_material_id=id).first()
+    
+    if usage_in_recipe:
+        product_name = usage_in_recipe.finished_product.name
+        flash(f"Nie można usunąć surowca '{material_to_delete.name}', ponieważ jest on używany w recepturze produktu '{product_name}'.", "danger")
+    else:
+        db.session.delete(material_to_delete)
+        db.session.commit()
+        flash(f"Usunięto surowiec: {material_to_delete.name}", "success")
+        
     return redirect(url_for('warehouse.manage_catalogue'))
+# === KONIEC ZMIANY ===
 
 @bp.route('/categories', methods=['GET', 'POST'])
 @login_required
