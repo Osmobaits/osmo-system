@@ -14,6 +14,41 @@
       {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
     {% endwith %}
 
+    {# === POCZĄTEK NOWEJ SEKCJI: SCHEMAT PROCESU === #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5>Schemat Pracy z Surowcami</h5>
+        </div>
+        <div class="card-body text-center">
+            <div class="row justify-content-center">
+                <div class="col-md-3">
+                    <div class="p-3 border rounded bg-light">
+                        <strong>Krok 1: Stwórz Kategorię</strong>
+                        <p class="small text-muted">np. "Mączki", "Ziarna"</p>
+                        <a href="{{ url_for('warehouse.manage_categories') }}" class="btn btn-sm btn-outline-secondary">Przejdź &raquo;</a>
+                    </div>
+                </div>
+                <div class="col-auto d-flex align-items-center fs-2">&rarr;</div>
+                <div class="col-md-3">
+                    <div class="p-3 border rounded bg-light">
+                        <strong>Krok 2: Dodaj Surowiec</strong>
+                        <p class="small text-muted">Przypisz surowiec do kategorii</p>
+                        <a href="{{ url_for('warehouse.manage_catalogue') }}" class="btn btn-sm btn-outline-secondary">Przejdź &raquo;</a>
+                    </div>
+                </div>
+                <div class="col-auto d-flex align-items-center fs-2">&rarr;</div>
+                <div class="col-md-3">
+                    <div class="p-3 border rounded bg-light">
+                        <strong>Krok 3: Przyjmij Partię</strong>
+                        <p class="small text-muted">Wprowadź dostawę na stan</p>
+                        <a href="#form-add-batch" class="btn btn-sm btn-outline-primary">Przewiń &raquo;</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {# === KONIEC NOWEJ SEKCJI === #}
+
     {% if low_stock_materials %}
     <div class="alert alert-danger shadow-sm" role="alert">
         <h4 class="alert-heading">Uwaga! Niskie stany magazynowe!</h4>
@@ -27,7 +62,7 @@
     </div>
     {% endif %}
 
-    <div class="card shadow-sm mb-5">
+    <div id="form-add-batch" class="card shadow-sm mb-5">
         <div class="card-header"><h3>Przyjmij nową partię surowca</h3></div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('warehouse.index') }}">
