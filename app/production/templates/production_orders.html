@@ -11,7 +11,43 @@
       {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
     {% endwith %}
 
-    <div class="card shadow-sm mb-5">
+    {# === POCZĄTEK NOWEJ SEKCJI: SCHEMAT PROCESU === #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5>Schemat Procesu Produkcyjnego</h5>
+        </div>
+        <div class="card-body">
+            <div class="list-group">
+                <a href="{{ url_for('warehouse.manage_catalogue') }}" class="list-group-item list-group-item-action">
+                    <strong>Krok 1: Przygotuj surowce i opakowania</strong>
+                    <p class="mb-0 small text-muted">Upewnij się, że wszystkie potrzebne surowce i opakowania są zdefiniowane w odpowiednich katalogach magazynowych.</p>
+                </a>
+                <div class="list-group-item text-center p-0 border-0 fs-4">&darr;</div>
+                <a href="{{ url_for('production.manage_catalogue') }}" class="list-group-item list-group-item-action">
+                    <strong>Krok 2: Zdefiniuj Produkt Gotowy</strong>
+                    <p class="mb-0 small text-muted">W "Katalogu Produktów Gotowych" stwórz produkt, określ jego kategorię, wagę i przypisz mu opakowania.</p>
+                </a>
+                <div class="list-group-item text-center p-0 border-0 fs-4">&darr;</div>
+                <a href="{{ url_for('production.manage_catalogue') }}" class="list-group-item list-group-item-action">
+                    <strong>Krok 3: Stwórz Recepturę</strong>
+                     <p class="mb-0 small text-muted">Dla stworzonego produktu zdefiniuj, z jakich surowców i w jakiej ilości ma powstać.</p>
+                </a>
+                <div class="list-group-item text-center p-0 border-0 fs-4">&darr;</div>
+                 <a href="#form-new-order" class="list-group-item list-group-item-action list-group-item-primary">
+                    <strong>Krok 4: Utwórz Zlecenie Produkcyjne (Jesteś tutaj)</strong>
+                     <p class="mb-0 small text-muted">Wybierz produkt i mnożnik receptury, aby zużyć surowce i utworzyć zlecenie.</p>
+                </a>
+                <div class="list-group-item text-center p-0 border-0 fs-4">&darr;</div>
+                 <a href="{{ url_for('production.manage_products') }}" class="list-group-item list-group-item-action">
+                    <strong>Krok 5: Zakończ Produkcję</strong>
+                     <p class="mb-0 small text-muted">W "Historii Produkcji" edytuj zlecenie i wpisz rzeczywistą wyprodukowaną ilość, aby dodać ją na stan.</p>
+                </a>
+            </div>
+        </div>
+    </div>
+    {# === KONIEC NOWEJ SEKCJI === #}
+
+    <div id="form-new-order" class="card shadow-sm mb-5">
         <div class="card-header"><h3>Utwórz nowe zlecenie produkcyjne</h3></div>
         <div class="card-body">
             <form method="POST">
@@ -41,7 +77,6 @@
         <div class="card-header"><h3>Historia Ostatnich Zleceń Produkcyjnych</h3></div>
         <div class="card-body">
             <table class="table table-striped table-hover">
-                {# === POCZĄTEK ZMIANY: AKTUALIZACJA NAGŁÓWKÓW TABELI === #}
                 <thead>
                     <tr>
                         <th>Data</th>
@@ -51,7 +86,6 @@
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
-                {# === KONIEC ZMIANY === #}
                 <tbody>
                     {% for order in orders %}
                     <tr>
@@ -64,10 +98,8 @@
                                 <span class="badge bg-danger ms-2">Wymagana próbka</span>
                             {% endif %}
                         </td>
-                        {# === POCZĄTEK ZMIANY: DODANIE NOWYCH DANYCH === #}
                         <td class="text-center">{{ order.planned_quantity }}</td>
                         <td class="text-center fw-bold">{{ order.quantity_produced }}</td>
-                        {# === KONIEC ZMIANY === #}
                         <td class="text-end">
                             <a href="{{ url_for('production.edit_batch', order_id=order.id) }}" class="btn btn-warning btn-sm">Edytuj</a>
                             <form method="POST" action="{{ url_for('production.delete_batch', order_id=order.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunąć to zlecenie? Spowoduje to zwrot surowców i produktów na stan magazynowy.');">
@@ -76,7 +108,6 @@
                         </td>
                     </tr>
                     {% else %}
-                    {# === ZMIANA: AKTUALIZACJA 'colspan' === #}
                     <tr>
                         <td colspan="5" class="text-center">Brak historii zleceń.</td>
                     </tr>
