@@ -95,17 +95,24 @@
                                         </div>
                                     </div>
                                 </form>
-                                <div class="text-end border-top pt-2 mt-2">
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info">Receptura</a>
-                                        <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary">Opakowania</a>
-                                        <button type="submit" form="edit-form-{{ product.id }}" class="btn btn-success">Zapisz</button>
-                                        <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
-                                            <button type="submit" class="btn btn-danger">Usuń</button>
-                                        </form>
+                                
+                                <div class="border-top pt-2 mt-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="text-start">
+                                            <span class="badge bg-primary">Składniki receptury: {{ product.recipe_components.count() }}</span>
+                                            <span class="badge bg-dark ms-1">Przypisane opakowania: {{ product.packaging_bill.count() }}</span>
+                                        </div>
+                                        <div class="text-end">
+                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                            <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm ms-2">Opakowania</a>
+                                            <button type="submit" form="edit-form-{{ product.id }}" class="btn btn-success btn-sm ms-2">Zapisz</button>
+                                            <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
+                                                <button type="submit" class="btn btn-danger btn-sm ms-2">Usuń</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                                </div>
                         </div>
                         {% endfor %}
                          <div class="text-end mt-2">
