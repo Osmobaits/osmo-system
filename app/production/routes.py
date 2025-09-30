@@ -370,3 +370,22 @@ def delete_packaging_component(id):
     db.session.commit()
     flash("Usunięto opakowanie ze specyfikacji.", "danger")
     return redirect(url_for('production.manage_packaging_bill', product_id=product_id))
+    
+@bp.route('/recipe/delete_component/<int:id>', methods=['POST'])
+@login_required
+@permission_required('production')
+def delete_recipe_component(id):
+    # Znajdź składnik, który chcemy usunąć
+    component_to_delete = RecipeComponent.query.get_or_404(id)
+    
+    # Zapisz ID produktu, aby wiedzieć, dokąd wrócić
+    product_id = component_to_delete.finished_product_id
+    
+    # Usuń składnik z bazy danych
+    db.session.delete(component_to_delete)
+    db.session.commit()
+    
+    flash('Składnik został usunięty z receptury.', 'success')
+    
+    # Wróć na stronę edycji receptury tego samego produktu
+    return redirect(url_for('production.manage_recipe', id=product_id))
