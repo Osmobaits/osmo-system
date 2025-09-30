@@ -73,7 +73,7 @@
                         {% for product in category.finished_products %}
                         <div class="card mb-2">
                              <div class="card-body">
-                                <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}">
+                                <form method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}" class="mb-2">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-6"><label class="form-label small">Nazwa</label><input type="text" class="form-control form-control-sm" name="name" value="{{ product.name }}"></div>
                                         <div class="col-md-3"><label class="form-label small">Kod</label><input type="text" class="form-control form-control-sm" name="product_code" value="{{ product.product_code or '' }}"></div>
@@ -98,16 +98,18 @@
                                     </div>
                                     <div class="row g-2 mt-2">
                                         <div class="col-12 text-end">
-                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
-                                            <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm">Opakowania</a>
                                             <button type="submit" class="btn btn-success btn-sm">Zapisz</button>
-                                            
-                                            <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
-                                                <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                                            </form>
-                                            </div>
+                                        </div>
                                     </div>
                                 </form>
+                                <div class="text-end border-top pt-2">
+                                    <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                    <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm">Opakowania</a>
+                                    
+                                    <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+                                    </form>
+                                    </div>
                             </div>
                         </div>
                         {% endfor %}
