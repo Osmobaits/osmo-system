@@ -155,18 +155,18 @@ def edit_material(id):
     all_categories = Category.query.order_by(Category.name).all()
     return render_template('edit_material.html', material=material_to_edit, categories=all_categories)
 
-# === POCZĄTEK ZMIANY: BEZPIECZNE USUWANIE ===
 @bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 @permission_required('warehouse')
 def delete_material(id):
     material_to_delete = RawMaterial.query.get_or_404(id)
     
-    # Sprawdzenie, czy surowiec jest używany w jakiejkolwiek recepturze
     usage_in_recipe = RecipeComponent.query.filter_by(raw_material_id=id).first()
     
     if usage_in_recipe:
-        product_name = usage_in_recipe.finished_product.name
+        # === POCZĄTEK ZMIANY: UŻYCIE POPRAWNEJ NAZWY RELACJI ===
+        product_name = usage_in_recipe.product.name
+        # === KONIEC ZMIANY ===
         flash(f"Nie można usunąć surowca '{material_to_delete.name}', ponieważ jest on używany w recepturze produktu '{product_name}'.", "danger")
     else:
         db.session.delete(material_to_delete)
@@ -174,7 +174,7 @@ def delete_material(id):
         flash(f"Usunięto surowiec: {material_to_delete.name}", "success")
         
     return redirect(url_for('warehouse.manage_catalogue'))
-# === KONIEC ZMIANY ===
+
 
 @bp.route('/categories', methods=['GET', 'POST'])
 @login_required
