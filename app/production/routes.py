@@ -30,6 +30,7 @@ def manage_catalogue():
             flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
             return redirect(url_for('production.manage_catalogue'))
 
+        # === ZMIANA: Usunięto obsługę 'packaging_id' ===
         if name and packaging_weight and category_id:
             new_product = FinishedProduct(
                 name=name, 
@@ -46,9 +47,8 @@ def manage_catalogue():
     categories = FinishedProductCategory.query.options(
         joinedload(FinishedProductCategory.finished_products)
     ).order_by(FinishedProductCategory.name).all()
-    all_packaging = Packaging.query.order_by(Packaging.name).all()
     
-    return render_template('manage_catalogue.html', categories=categories, all_packaging=all_packaging)
+    return render_template('manage_catalogue.html', categories=categories)
 
 @bp.route('/catalogue/check_code')
 @login_required
@@ -71,6 +71,7 @@ def edit_catalogue_product(id):
     product.product_code = request.form.get('product_code')
     product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
     product.category_id = request.form.get('category_id', type=int)
+    # === ZMIANA: Usunięto obsługę 'packaging_id' ===
     db.session.commit()
     flash("Zapisano zmiany w produkcie.", "success")
     return redirect(url_for('production.manage_catalogue'))
@@ -81,6 +82,12 @@ def edit_catalogue_product(id):
 @permission_required('production')
 def delete_product(id):
     product = FinishedProduct.query.get_or_404(id)
+    # Sprawdzenie, czy produkt nie jest używany jako półprodukt w innej recepturze
+    usage_in_recipe = RecipeComponent.query.filter_by(sub_product_id=id).first()
+    if usage_in_recipe:
+        flash(f"Nie można usunąć produktu '{product.name}', ponieważ jest on używany jako PÓŁPRODUKT w recepturze produktu '{usage_in_recipe.product.name}'.", "danger")
+        return redirect(url_for('production.manage_catalogue'))
+
     db.session.delete(product)
     db.session.commit()
     flash(f"Produkt '{product.name}' i jego historia produkcji zostały usunięte.", "danger")
@@ -176,20 +183,16 @@ def manage_production_orders():
             flash(f"Produkt '{product.name}' nie ma zdefiniowanej receptury. Produkcja niemożliwa.", "danger")
             return redirect(url_for('production.manage_production_orders'))
         
-        # === POCZĄTEK PRZEBUDOWY LOGIKI ZUŻYCIA ===
         raw_material_plan = []
         sub_product_plan = []
         can_produce = True
         
         for component in product.recipe_components:
             required_quantity = component.quantity_required * batch_size
-
-            # Sprawdzanie surowców
             if component.raw_material_id:
                 available_batches = RawMaterialBatch.query.filter_by(raw_material_id=component.raw_material_id)\
                                                           .filter(RawMaterialBatch.quantity_on_hand > 0)\
                                                           .order_by(RawMaterialBatch.received_date).all()
-                
                 total_available = sum(b.quantity_on_hand for b in available_batches)
                 if total_available < required_quantity:
                     flash(f"Niewystarczająca ilość surowca: {component.raw_material.name}. Brakuje {required_quantity - total_available:.2f}.", "danger")
@@ -202,8 +205,6 @@ def manage_production_orders():
                     quantity_to_take = min(temp_required, batch.quantity_on_hand)
                     raw_material_plan.append({'batch': batch, 'quantity': quantity_to_take})
                     temp_required -= quantity_to_take
-
-            # Sprawdzanie półproduktów
             elif component.sub_product_id:
                 sub_product = FinishedProduct.query.get(component.sub_product_id)
                 if sub_product.quantity_in_stock < required_quantity:
@@ -214,11 +215,8 @@ def manage_production_orders():
 
         if not can_produce:
             return redirect(url_for('production.manage_production_orders'))
-
-        # Obliczanie ilości planowanej
-        # Uwaga: Ta logika może wymagać dostosowania, jeśli mieszamy kg i szt.
-        # Na razie zakładamy, że waga półproduktów to 1.
-        total_weight = sum(item['quantity'] for item in raw_material_plan) + sum(item['quantity'] for item in sub_product_plan)
+        
+        total_weight = sum(c.quantity_required for c in product.recipe_components) * batch_size
         planned_quantity = math.floor(total_weight / product.packaging_weight_kg) if product.packaging_weight_kg > 0 else 0
 
         if planned_quantity <= 0:
@@ -230,23 +228,20 @@ def manage_production_orders():
             db.session.add(new_order)
             db.session.flush()
 
-            # Zdejmowanie surowców ze stanu
             for item in raw_material_plan:
                 item['batch'].quantity_on_hand -= item['quantity']
                 log_entry = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=item['batch'].id, quantity_consumed=item['quantity'])
                 db.session.add(log_entry)
             
-            # Zdejmowanie półproduktów ze stanu
             for item in sub_product_plan:
                 item['product'].quantity_in_stock -= item['quantity']
-                # Logika logowania zużycia półproduktów może wymagać rozbudowy, jeśli chcemy śledzić partie
+                # TODO: Logika logowania zużycia półproduktów
                 
             db.session.commit()
             flash(f"Zlecenie na {planned_quantity} opakowań '{product.name}' zostało utworzone.", "success")
         except Exception as e:
             db.session.rollback()
             flash(f"Wystąpił błąd podczas produkcji: {e}", "danger")
-        # === KONIEC PRZEBUDOWY LOGIKI ZUŻYCIA ===
             
         return redirect(url_for('production.manage_production_orders'))
 
@@ -276,10 +271,10 @@ def edit_batch(order_id):
                 product = order.finished_product
                 product.quantity_in_stock += quantity_difference
 
-                # Zdejmowanie opakowań
-                if product.packaging_bill.first():
+                if product.packaging_bill:
                     for item in product.packaging_bill:
-                        item.packaging.quantity_in_stock -= (item.quantity_required * quantity_difference)
+                        if item.packaging:
+                            item.packaging.quantity_in_stock -= (item.quantity_required * quantity_difference)
 
             order.quantity_produced = new_produced_quantity
             
@@ -310,13 +305,15 @@ def delete_batch(order_id):
             # TODO: Logika zwrotu półproduktów
         
         product = order.finished_product
+        # Zwrot produktu gotowego
         product.quantity_in_stock -= order.quantity_produced
         
-        # Zwracanie opakowań
-        if product.packaging_bill.first():
+        # Zwrot opakowań
+        if product.packaging_bill:
             for item in product.packaging_bill:
-                item.packaging.quantity_in_stock += (item.quantity_required * order.quantity_produced)
-
+                if item.packaging:
+                    item.packaging.quantity_in_stock += (item.quantity_required * order.quantity_produced)
+        
         ProductionLog.query.filter_by(production_order_id=order_id).delete()
         db.session.delete(order)
         db.session.commit()
