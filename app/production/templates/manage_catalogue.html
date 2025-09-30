@@ -82,23 +82,26 @@
                                         </div>
                                     </div>
                                 </form>
-                                {# === POCZĄTEK NOWEJ SEKCJI: INFORMACJA O OPAKOWANIACH === #}
                                 <div class="border-top mt-2 pt-2">
-                                    {% set packaging_count = product.packaging_bill.count() %}
-                                    <p class="small text-muted mb-0">
-                                        Przypisano opakowań: 
-                                        <span class="badge bg-info">{{ packaging_count }}</span>
-                                    </p>
-                                </div>
-                                {# === KONIEC NOWEJ SEKCJI === #}
-                                <div class="text-end border-top pt-2 mt-2">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info">Receptura</a>
-                                        <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary">Opakowania</a>
-                                        <button type="submit" form="edit-form-{{ product.id }}" class="btn btn-success">Zapisz</button>
-                                        <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
-                                            <button type="submit" class="btn btn-danger">Usuń</button>
-                                        </form>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        {# === POCZĄTEK ZMIANY: DODANIE LICZNIKA SKŁADNIKÓW I POPRAWA PRZYCISKÓW === #}
+                                        <div class="small text-muted">
+                                            <div>
+                                                Przypisano opakowań: <span class="badge bg-secondary">{{ product.packaging_bill.count() }}</span>
+                                            </div>
+                                            <div>
+                                                Składników w recepturze: <span class="badge bg-info">{{ product.recipe_components.count() }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                            <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm ms-1">Opakowania</a>
+                                            <button type="submit" form="edit-form-{{ product.id }}" class="btn btn-success btn-sm ms-1">Zapisz</button>
+                                            <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
+                                                <button type="submit" class="btn btn-danger btn-sm ms-1">Usuń</button>
+                                            </form>
+                                        </div>
+                                        {# === KONIEC ZMIANY === #}
                                     </div>
                                 </div>
                             </div>
