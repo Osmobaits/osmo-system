@@ -29,22 +29,6 @@
         </div>
 
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-dark">
-                <h5 class="mb-0">Otwarte Zlecenia Produkcyjne ({{ open_production_orders|length }})</h5>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for order in open_production_orders %}
-                <a href="{{ url_for('production.edit_batch', order_id=order.id) }}" class="list-group-item list-group-item-action">
-                    Zlecenie #{{ order.id }} - <strong>{{ order.finished_product.name }}</strong>
-                    <small class="d-block text-muted">Data zlecenia: {{ order.order_date | localdatetime }}</small>
-                </a>
-                {% else %}
-                <div class="list-group-item text-center text-muted">Brak otwartych zleceń.</div>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <div class="card shadow-sm mb-4">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">Niskie Stany Surowców ({{ low_stock_materials|length }})</h5>
             </div>
@@ -55,7 +39,23 @@
                     <span class="float-end">Stan: {{ "%.2f"|format(material.current_stock) }} / Krytyczny: {{ material.critical_stock_level }}</span>
                 </a>
                 {% else %}
-                <div class="list-group-item text-center text-muted">Wszystkie stany w normie.</div>
+                <div class="list-group-item text-center text-muted">Wszystkie stany surowców w normie.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Niskie Stany Opakowań ({{ low_stock_packaging|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for item in low_stock_packaging %}
+                <a href="{{ url_for('packaging.index') }}#category-{{ item.category.name | lower | replace(' ', '-') }}" class="list-group-item list-group-item-action">
+                    <strong>{{ item.name }}</strong>
+                    <span class="float-end">Stan: {{ item.quantity_in_stock }} / Krytyczny: {{ item.critical_stock_level }}</span>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Wszystkie stany opakowań w normie.</div>
                 {% endfor %}
             </div>
         </div>
@@ -87,6 +87,22 @@
                 </a>
                 {% else %}
                 <div class="list-group-item text-center text-muted">Brak zamówień do fakturowania.</div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-dark">
+                <h5 class="mb-0">Otwarte Zlecenia Produkcyjne ({{ open_production_orders|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for order in open_production_orders %}
+                <a href="{{ url_for('production.edit_batch', order_id=order.id) }}" class="list-group-item list-group-item-action">
+                    Zlecenie #{{ order.id }} - <strong>{{ order.finished_product.name }}</strong>
+                    <small class="d-block text-muted">Data zlecenia: {{ order.order_date | localdatetime }}</small>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Brak otwartych zleceń.</div>
                 {% endfor %}
             </div>
         </div>

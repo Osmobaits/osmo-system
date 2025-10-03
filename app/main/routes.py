@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for
 from flask_login import login_required, current_user
-from app.models import db, RawMaterial, Order, ProductionOrder, Task, VacationRequest
+from app.models import db, RawMaterial, Packaging, Order, ProductionOrder, Task, VacationRequest
 
 bp = Blueprint('main', __name__)
 
@@ -8,15 +8,20 @@ bp = Blueprint('main', __name__)
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    # --- MODUŁ MAGAZYN ---
-    # Znajdź wszystkie surowce, których łączny stan jest poniżej poziomu krytycznego
+    # --- MODUŁ MAGAZYN SUROWCÓW ---
     low_stock_materials = []
     all_materials = RawMaterial.query.all()
     for material in all_materials:
         current_stock = sum(batch.quantity_on_hand for batch in material.batches)
         if material.critical_stock_level > 0 and current_stock < material.critical_stock_level:
-            material.current_stock = current_stock  # Dodajemy atrybut pomocniczy
+            material.current_stock = current_stock
             low_stock_materials.append(material)
+
+    # --- MODUŁ MAGAZYN OPAKOWAŃ (NOWOŚĆ) ---
+    low_stock_packaging = Packaging.query.filter(
+        Packaging.quantity_in_stock < Packaging.critical_stock_level,
+        Packaging.critical_stock_level > 0
+    ).order_by(Packaging.name).all()
 
     # --- MODUŁ ZAMÓWIENIA ---
     active_orders = Order.query.filter_by(is_archived=False).order_by(Order.order_date.desc()).limit(5).all()
@@ -36,6 +41,7 @@ def dashboard():
     return render_template(
         'dashboard.html',
         low_stock_materials=low_stock_materials,
+        low_stock_packaging=low_stock_packaging,
         active_orders=active_orders,
         orders_to_invoice=orders_to_invoice,
         open_production_orders=open_production_orders,
@@ -43,7 +49,6 @@ def dashboard():
         pending_vacations=pending_vacations
     )
 
-# Ta trasa nie jest już potrzebna, bo /dashboard jest nową stroną główną
 @bp.route('/home')
 @login_required
 def home():
