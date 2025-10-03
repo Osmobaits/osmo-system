@@ -25,7 +25,7 @@ def login():
             db.session.commit() # Commit jest potrzebny, aby zapisać log przed przekierowaniem
             
             flash('Zalogowano pomyślnie!', 'success')
-            return redirect(url_for('main.home'))
+            return redirect(url_for('main.dashboard'))
         else:
             flash('Nieprawidłowa nazwa użytkownika lub hasło.', 'danger')
     return render_template('login.html')

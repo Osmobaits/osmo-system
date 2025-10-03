@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Panel Sterowania{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1>Panel Sterowania</h1>
+    <p class="lead">Przegląd kluczowych zdarzeń wymagających Twojej uwagi.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Nowe Zadania dla Ciebie ({{ new_tasks_for_user|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for task in new_tasks_for_user %}
+                <a href="{{ url_for('tasks.task_details', id=task.id) }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <strong class="mb-1">{{ task.title }}</strong>
+                        <small>od: {{ task.assigner.username }}</small>
+                    </div>
+                    <small class="text-muted">Status: {{ task.status }}</small>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Brak nowych zadań.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-dark">
+                <h5 class="mb-0">Otwarte Zlecenia Produkcyjne ({{ open_production_orders|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for order in open_production_orders %}
+                <a href="{{ url_for('production.edit_batch', order_id=order.id) }}" class="list-group-item list-group-item-action">
+                    Zlecenie #{{ order.id }} - <strong>{{ order.finished_product.name }}</strong>
+                    <small class="d-block text-muted">Data zlecenia: {{ order.order_date | localdatetime }}</small>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Brak otwartych zleceń.</div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Niskie Stany Surowców ({{ low_stock_materials|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for material in low_stock_materials %}
+                <a href="{{ url_for('warehouse.index') }}#category-{{ material.category.name | lower | replace(' ', '-') }}" class="list-group-item list-group-item-action">
+                    <strong>{{ material.name }}</strong>
+                    <span class="float-end">Stan: {{ "%.2f"|format(material.current_stock) }} / Krytyczny: {{ material.critical_stock_level }}</span>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Wszystkie stany w normie.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Zamówienia w Realizacji</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for order in active_orders %}
+                <a href="{{ url_for('orders.order_details', id=order.id) }}" class="list-group-item list-group-item-action">
+                    Zamówienie #{{ order.id }} - <strong>{{ order.client.name }}</strong>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Brak aktywnych zamówień.</div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">Zamówienia do Zafakturowania</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for order in orders_to_invoice %}
+                <a href="{{ url_for('orders.order_details', id=order.id) }}" class="list-group-item list-group-item-action">
+                    Zamówienie #{{ order.id }} - <strong>{{ order.client.name }}</strong>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Brak zamówień do fakturowania.</div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        {% if current_user.has_role('admin') and pending_vacations %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Wnioski Urlopowe do Akceptacji ({{ pending_vacations|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for req in pending_vacations %}
+                <a href="{{ url_for('vacations.index') }}" class="list-group-item list-group-item-action">
+                    Wniosek od: <strong>{{ req.user.username }}</strong>
+                    <small class="d-block text-muted">{{ req.start_date.strftime('%d.%m.%Y') }} - {{ req.end_date.strftime('%d.%m.%Y') }}</small>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
