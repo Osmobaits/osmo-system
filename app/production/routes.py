@@ -4,6 +4,7 @@ from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, Produc
 from flask_login import login_required
 from app.decorators import permission_required
 import math
+from app.utils import log_activity
 
 bp = Blueprint('production', __name__, template_folder='templates', url_prefix='/production')
 
@@ -166,77 +167,90 @@ def manage_production_orders():
         batch_size = request.form.get('batch_size', type=int)
 
         if not product_id or not batch_size or batch_size <= 0:
-            flash("Proszę wybrać produkt i podać prawidłową liczbę porcji.", "warning")
+            flash('Proszę wybrać produkt i podać prawidłową liczbę porcji.', 'warning')
             return redirect(url_for('production.manage_production_orders'))
 
         product = FinishedProduct.query.get_or_404(product_id)
-        if not product.recipe_components.first():
-            flash(f"Produkt '{product.name}' nie ma zdefiniowanej receptury. Produkcja niemożliwa.", "danger")
-            return redirect(url_for('production.manage_production_orders'))
         
-        raw_material_plan = []
-        sub_product_plan = []
-        can_produce = True
-        
+        missing_components = []
+        missing_packaging = []
+
+        # === KROK 1: WERYFIKACJA SUROWCÓW I PÓŁPRODUKTÓW ===
         for component in product.recipe_components:
             required_quantity = component.quantity_required * batch_size
-            if component.raw_material_id:
-                available_batches = RawMaterialBatch.query.filter_by(raw_material_id=component.raw_material_id)\
-                                                          .filter(RawMaterialBatch.quantity_on_hand > 0)\
-                                                          .order_by(RawMaterialBatch.received_date).all()
-                total_available = sum(b.quantity_on_hand for b in available_batches)
-                if total_available < required_quantity:
-                    flash(f"Niewystarczająca ilość surowca: {component.raw_material.name}. Brakuje {required_quantity - total_available:.2f}.", "danger")
-                    can_produce = False
-                    break
-                
-                temp_required = required_quantity
-                for batch in available_batches:
-                    if temp_required <= 0: break
-                    quantity_to_take = min(temp_required, batch.quantity_on_hand)
-                    raw_material_plan.append({'batch': batch, 'quantity': quantity_to_take})
-                    temp_required -= quantity_to_take
-            elif component.sub_product_id:
-                sub_product = FinishedProduct.query.get(component.sub_product_id)
-                if sub_product.quantity_in_stock < required_quantity:
-                    flash(f"Niewystarczająca ilość półproduktu: {sub_product.name}. Brakuje {required_quantity - sub_product.quantity_in_stock} szt.", "danger")
-                    can_produce = False
-                    break
-                sub_product_plan.append({'product': sub_product, 'quantity': required_quantity})
+            
+            # Sprawdzenie surowców
+            if component.raw_material:
+                total_stock = sum(batch.quantity_on_hand for batch in component.raw_material.batches)
+                if total_stock < required_quantity:
+                    missing_components.append(f"{component.raw_material.name} (brakuje: {required_quantity - total_stock:.2f} {component.unit})")
+            
+            # Sprawdzenie półproduktów
+            elif component.sub_product:
+                if component.sub_product.quantity_in_stock < required_quantity:
+                    missing_components.append(f"{component.sub_product.name} (brakuje: {required_quantity - component.sub_product.quantity_in_stock:.2f} {component.unit})")
 
-        if not can_produce:
-            return redirect(url_for('production.manage_production_orders'))
-        
-        total_weight = sum(c.quantity_required for c in product.recipe_components) * batch_size
-        planned_quantity = math.floor(total_weight / product.packaging_weight_kg) if product.packaging_weight_kg > 0 else 0
+        # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
+        # Zakładamy, że ilość opakowań jest na jedną sztukę produktu, więc mnożymy ją przez planowaną ilość
+        planned_quantity = batch_size # Uproszczenie, jeśli 1 wsad = 1 sztuka
+        for item in product.packaging_bill:
+            required_packaging = item.quantity_required * planned_quantity
+            if item.packaging.quantity_in_stock < required_packaging:
+                missing_packaging.append(f"{item.packaging.name} (brakuje: {required_packaging - item.packaging.quantity_in_stock})")
 
-        if planned_quantity <= 0:
-            flash("Wyprodukowana ilość jest zbyt mała, aby stworzyć chociaż jedno opakowanie produktu.", "warning")
+        # === KROK 3: OBSŁUGA BRAKÓW ===
+        if missing_components or missing_packaging:
+            error_message = "Brak wystarczających zasobów do rozpoczęcia produkcji. Brakuje:<br>"
+            if missing_components:
+                error_message += "<b>Składniki:</b><ul>" + "".join(f"<li>{m}</li>" for m in missing_components) + "</ul>"
+            if missing_packaging:
+                error_message += "<b>Opakowania:</b><ul>" + "".join(f"<li>{m}</li>" for m in missing_packaging) + "</ul>"
+            flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
-        try:
-            new_order = ProductionOrder(finished_product_id=product.id, planned_quantity=planned_quantity, quantity_produced=0)
-            db.session.add(new_order)
-            db.session.flush()
+        # === KROK 4: WYSTARCZAJĄCE ZASOBY - ROZPOCZNIJ PRODUKCJĘ ===
+        new_order = ProductionOrder(
+            finished_product_id=product.id,
+            planned_quantity=planned_quantity,
+            quantity_produced=0,
+            sample_required=False 
+        )
+        db.session.add(new_order)
+        db.session.flush()
 
-            for item in raw_material_plan:
-                item['batch'].quantity_on_hand -= item['quantity']
-                log_entry = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=item['batch'].id, quantity_consumed=item['quantity'])
-                db.session.add(log_entry)
+        # Odejmowanie zasobów z magazynu
+        for component in product.recipe_components:
+            required_quantity = component.quantity_required * batch_size
             
-            for item in sub_product_plan:
-                item['product'].quantity_in_stock -= item['quantity']
-                
-            db.session.commit()
-            flash(f"Zlecenie na {planned_quantity} opakowań '{product.name}' zostało utworzone.", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Wystąpił błąd podczas produkcji: {e}", "danger")
+            if component.raw_material:
+                # Logika FIFO - pobieraj z najstarszych partii
+                batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
+                for batch in batches:
+                    if required_quantity <= 0: break
+                    take_qty = min(batch.quantity_on_hand, required_quantity)
+                    batch.quantity_on_hand -= take_qty
+                    
+                    log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=take_qty)
+                    db.session.add(log)
+                    
+                    required_quantity -= take_qty
             
+            elif component.sub_product:
+                component.sub_product.quantity_in_stock -= required_quantity
+                # Tu można dodać logikę ProductionLog dla półproduktów, jeśli potrzebna
+
+        db.session.commit()
+
+        # Logowanie aktywności
+        log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'",
+                     'production.production_order_details', order_id=new_order.id)
+
+        flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
+    # Kod dla metody GET (wyświetlanie strony)
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
-    orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).limit(20).all()
+    orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('production_orders.html', products=products, orders=orders)
 
 
@@ -244,39 +258,33 @@ def manage_production_orders():
 @login_required
 @permission_required('production')
 def edit_batch(order_id):
-    order = ProductionOrder.query.get_or_404(order_id)
-    original_produced_quantity = order.quantity_produced
+    batch = ProductionOrder.query.get_or_404(order_id)
+    product = batch.finished_product
+    original_quantity_produced = batch.quantity_produced
 
     if request.method == 'POST':
-        new_produced_quantity = request.form.get('quantity', type=int)
-        
-        if new_produced_quantity is None or new_produced_quantity < 0:
-            flash("Podano nieprawidłową ilość.", "danger")
-            return redirect(url_for('production.edit_batch', order_id=order_id))
-        
-        try:
-            quantity_difference = new_produced_quantity - original_produced_quantity
-            
-            if quantity_difference != 0:
-                product = order.finished_product
-                product.quantity_in_stock += quantity_difference
+        new_quantity_produced = request.form.get('quantity', type=int)
+        quantity_diff = new_quantity_produced - original_quantity_produced
 
-                if product.packaging_bill:
-                    for item in product.packaging_bill:
-                        if item.packaging:
-                            item.packaging.quantity_in_stock -= (item.quantity_required * quantity_difference)
+        batch.quantity_produced = new_quantity_produced
+        product.quantity_in_stock += quantity_diff
 
-            order.quantity_produced = new_produced_quantity
-            
-            db.session.commit()
-            flash(f"Zaktualizowano rzeczywistą ilość w partii. Stany magazynowe produktów i opakowań zostały skorygowane.", "success")
-            return redirect(url_for('production.manage_products'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Wystąpił błąd podczas edycji: {e}", "danger")
-            return redirect(url_for('production.edit_batch', order_id=order_id))
+        if quantity_diff != 0:
+            for item in product.packaging_bill:
+                packaging_item = item.packaging
+                packaging_item.quantity_in_stock -= (item.quantity_required * quantity_diff)
 
-    return render_template('edit_batch.html', batch=order)
+        db.session.commit()
+
+        # Logowanie aktywności
+        log_activity(f"Zakończył produkcję partii #{batch.id} ('{batch.finished_product.name}'), "
+                     f"produkując {batch.quantity_produced} szt.",
+                     'production.production_order_details', order_id=batch.id)
+
+        flash(f"Zaktualizowano partię produkcyjną. Stan magazynowy produktu '{product.name}' został zaktualizowany.", "success")
+        return redirect(url_for('production.manage_products'))
+
+    return render_template('edit_batch.html', batch=batch)
 
 
 @bp.route('/batch/delete/<int:order_id>', methods=['POST'])

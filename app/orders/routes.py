@@ -100,10 +100,16 @@ def delete_client_product(id):
 @login_required
 @permission_required('orders')
 def add_order(id):
-    new_order = Order(client_id=id)
+    client = Client.query.get_or_404(id)
+    new_order = Order(client_id=client.id, order_date=datetime.utcnow())
     db.session.add(new_order)
     db.session.commit()
-    flash("Utworzono nowe zamówienie.", "success")
+
+    # Logowanie aktywności
+    log_activity(f"Utworzył nowe zamówienie #{new_order.id} dla klienta: '{client.name}'",
+                 'orders.order_details', id=new_order.id)
+
+    flash('Utworzono nowe, puste zamówienie.', 'success')
     return redirect(url_for('orders.order_details', id=new_order.id))
 
 @bp.route('/order/<int:id>', methods=['GET', 'POST'])
@@ -159,19 +165,22 @@ def update_order_product_quantity(id):
 @permission_required('orders')
 def archive_order(id):
     order = Order.query.get_or_404(id)
-    invoice_number = request.form.get('invoice_number')
-    
-    # Ustawiamy status na zarchiwizowany (nic się nie stanie, jeśli już jest)
     order.is_archived = True
-    
-    # Aktualizujemy lub dodajemy numer faktury
-    order.invoice_number = invoice_number if invoice_number else None
-    
+    invoice_number = request.form.get('invoice_number')
+    if invoice_number:
+        order.invoice_number = invoice_number
     db.session.commit()
-    flash("Zamówienie zostało zaktualizowane i zarchiwizowane.", "success")
-    
-    # Przekierowujemy z powrotem na pulpit, aby zobaczyć efekt na listach
-    return redirect(url_for('orders.manage_clients'))
+
+    # Logowanie aktywności
+    if order.invoice_number:
+        log_activity(f"Zakończył i zarchiwizował zamówienie #{order.id} z fakturą: '{order.invoice_number}'",
+                     'orders.order_details', id=order.id)
+    else:
+        log_activity(f"Zakończył i zarchiwizował zamówienie #{order.id} (bez faktury)",
+                     'orders.order_details', id=order.id)
+
+    flash('Zamówienie zostało pomyślnie zarchiwizowane.', 'success')
+    return redirect(url_for('orders.order_details', id=id))
 
 @bp.route('/order/delete_archived/<int:id>', methods=['POST'])
 @login_required

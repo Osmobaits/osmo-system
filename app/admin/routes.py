@@ -135,3 +135,14 @@ def statistics():
         weekly_stats=weekly_stats,
         monthly_stats=monthly_stats
     )
+    
+@bp.route('/activity_log')
+@login_required
+@permission_required('admin')
+def activity_log():
+    page = request.args.get('page', 1, type=int)
+    # Pobierz logi posortowane od najnowszych, z podziałem na strony
+    logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).paginate(
+        page=page, per_page=25
+    )
+    return render_template('activity_log.html', logs=logs)

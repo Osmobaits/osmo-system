@@ -216,3 +216,16 @@ class SalesReportLog(db.Model):
     report_date = db.Column(db.Date, nullable=False)
     quantity_sold = db.Column(db.Integer, nullable=False)
     product = db.relationship('FinishedProduct')
+    
+class ActivityLog(db.Model):
+    __tablename__ = 'activity_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    action = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(255), nullable=True)  # Opcjonalny link do obiektu
+
+    user = db.relationship('User', backref='activity_logs')
+
+    def __repr__(self):
+        return f'<ActivityLog {self.user.username}: {self.action[:50]}>'

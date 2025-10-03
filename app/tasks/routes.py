@@ -10,6 +10,8 @@ from werkzeug.utils import secure_filename
 from app.decorators import permission_required
 from flask_mail import Message
 from app import mail
+from app.utils import log_activity
+
 
 bp = Blueprint('tasks', __name__, template_folder='templates', url_prefix='/tasks')
 
@@ -47,43 +49,64 @@ def create_task():
     if request.method == 'POST':
         title = request.form.get('title')
         description = request.form.get('description')
-        assignee_ids = request.form.getlist('assignee_ids', type=int)
-        priority = request.form.get('priority')
+        priority = request.form.get('priority', type=int)
         due_date_str = request.form.get('due_date')
-        files = request.files.getlist('attachments')
-        if not title or not assignee_ids:
-            flash("Tytuł i przynajmniej jeden pracownik są wymagane.", "warning")
-            return redirect(url_for('tasks.create_task'))
-        
         due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
-        new_task = Task(
-            title=title, description=description, assigner_id=current_user.id,
-            priority=int(priority), due_date=due_date
-        )
+        assignee_ids = request.form.getlist('assignee_ids')
+        files = request.files.getlist('attachments')
+
+        if not title or not assignee_ids:
+            flash('Tytuł i przynajmniej jeden pracownik są wymagane.', 'warning')
+            return redirect(url_for('tasks.create_task'))
+            
         assignees = User.query.filter(User.id.in_(assignee_ids)).all()
-        new_task.assignees.extend(assignees)
+        
+        new_task = Task(
+            title=title, 
+            description=description, 
+            priority=priority, 
+            due_date=due_date, 
+            assigner_id=current_user.id, 
+            assignees=assignees
+        )
         db.session.add(new_task)
         
+        # Obsługa załączników
         for file in files:
             if file and file.filename != '':
                 filename = secure_filename(file.filename)
-                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-                file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
-                attachment = TaskAttachment(task=new_task, filename=filename, filepath=filename)
+                # Tworzymy unikalną ścieżkę, aby uniknąć nadpisywania plików
+                unique_filename = f"{datetime.utcnow().timestamp()}_{filename}"
+                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                
+                attachment = TaskAttachment(task=new_task, filename=filename, filepath=unique_filename)
                 db.session.add(attachment)
+
         db.session.commit()
 
-        try:
-            for assignee in assignees:
-                if assignee.email:
-                    msg = Message(f"Nowe zadanie w systemie: {new_task.title}", recipients=[assignee.email])
-                    msg.body = f"Cześć {assignee.username},\n\nPrzypisano Ci nowe zadanie: \"{new_task.title}\"."
-                    mail.send(msg)
-            flash("Zadanie zostało utworzone, a pracownicy poinformowani.", "success")
-        except Exception as e:
-            flash(f"Zadanie utworzono, ale wystąpił błąd przy wysyłce e-maili: {e}", "danger")
-        return redirect(url_for('tasks.index'))
+        # Logowanie aktywności
+        assignee_names = ", ".join([u.username for u in assignees])
+        log_activity(f"Utworzył nowe zadanie: '{new_task.title}' dla: {assignee_names}",
+                     'tasks.task_details', id=new_task.id)
 
+        # Wysyłka powiadomień e-mail (jeśli używasz tej funkcji)
+        # try:
+        #     for user in assignees:
+        #         if user.email:
+        #             send_email(
+        #                 '[OSMO System] Nowe zadanie dla Ciebie',
+        #                 recipients=[user.email],
+        #                 template='email/new_task',
+        #                 user=user,
+        #                 task=new_task
+        #             )
+        # except Exception as e:
+        #     flash(f'Zadanie utworzono, ale wystąpił błąd podczas wysyłania powiadomień e-mail: {e}', 'warning')
+
+        flash('Pomyślnie utworzono zadanie.', 'success')
+        return redirect(url_for('tasks.index'))
+        
     users = User.query.order_by(User.username).all()
     return render_template('create_task.html', users=users)
 
@@ -138,12 +161,18 @@ def accept_task(id):
 @permission_required('tasks')
 def complete_task(id):
     task = Task.query.get_or_404(id)
-    if current_user in task.assignees and task.status == 'Przyjęte':
-        task.status = 'Zakończone'
-        db.session.commit()
-        flash("Zadanie zostało oznaczone jako zakończone.", "success")
-    else:
-        flash("Nie możesz wykonać tej akcji.", "warning")
+    if current_user not in task.assignees and not current_user.has_role('admin'):
+        flash('Nie masz uprawnień do wykonania tej akcji.', 'danger')
+        return redirect(url_for('tasks.index'))
+        
+    task.status = 'Zakończone'
+    db.session.commit()
+
+    # Logowanie aktywności
+    log_activity(f"Zakończył zadanie: '{task.title}'",
+                 'tasks.task_details', id=task.id)
+
+    flash('Zadanie zostało oznaczone jako zakończone.', 'success')
     return redirect(url_for('tasks.task_details', id=id))
     
 @bp.route('/download/<path:filename>')

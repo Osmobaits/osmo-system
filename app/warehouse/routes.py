@@ -6,6 +6,7 @@ from app.decorators import permission_required
 from datetime import date, datetime
 from sqlalchemy.orm import joinedload
 from sqlalchemy import asc, desc
+from app.utils import log_activity
 
 bp = Blueprint('warehouse', __name__, template_folder='templates', url_prefix='/warehouse')
 
@@ -18,6 +19,7 @@ def index():
         batch_number = request.form.get('batch_number')
         quantity = request.form.get('quantity')
         unit = request.form.get('unit')
+        
         if raw_material_id and batch_number and quantity and unit:
             new_batch = RawMaterialBatch(
                 raw_material_id=int(raw_material_id),
@@ -28,6 +30,12 @@ def index():
             )
             db.session.add(new_batch)
             db.session.commit()
+
+            # Logowanie aktywności
+            log_activity(f"Przyjął na stan partię surowca '{new_batch.material.name}' "
+                         f"(nr: {new_batch.batch_number}, ilość: {new_batch.quantity_on_hand} {new_batch.unit})",
+                         'warehouse.edit_batch', id=new_batch.id)
+
             flash(f"Dodano nową partię surowca.", "success")
         else:
             flash("Wszystkie pola są wymagane.", "warning")
@@ -35,9 +43,7 @@ def index():
 
     sort_by = request.args.get('sort_by', 'received_date')
     order = request.args.get('order', 'desc')
-
     query = RawMaterialBatch.query.join(RawMaterial)
-
     sort_map = {
         'received_date': RawMaterialBatch.received_date,
         'name': RawMaterial.name,
@@ -52,7 +58,6 @@ def index():
         query = query.order_by(desc(sort_column))
         
     all_batches = query.all()
-    
     categories = Category.query.options(joinedload(Category.raw_materials)).order_by(Category.name).all()
 
     total_stocks = {}
