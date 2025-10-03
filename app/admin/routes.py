@@ -1,6 +1,6 @@
 # app/admin/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct
+from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct, ActivityLog
 from flask_login import login_required, current_user
 from app.decorators import permission_required
 from app.auth.routes import bcrypt
