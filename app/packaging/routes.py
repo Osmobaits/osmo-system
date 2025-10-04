@@ -13,7 +13,7 @@ bp = Blueprint('packaging', __name__, template_folder='templates', url_prefix='/
 @permission_required('warehouse')
 def index():
     if request.method == 'POST':
-        # Logika dodawania nowego opakowania
+        # Logika dodawania nowego opakowania (bez zmian)
         name = request.form.get('name')
         category_id = request.form.get('category_id')
         quantity = request.form.get('quantity')
@@ -47,11 +47,20 @@ def index():
     
     all_packaging = query.all()
 
+    # --- NOWY FRAGMENT ---
+    # Wyszukaj opakowania poniżej stanu krytycznego
+    low_stock_packaging = [
+        p for p in all_packaging 
+        if p.critical_stock_level > 0 and p.quantity_in_stock < p.critical_stock_level
+    ]
+    # ---------------------
+
     categories = PackagingCategory.query.order_by(PackagingCategory.name).all()
     
     return render_template('packaging_index.html', 
                            categories=categories, 
                            all_packaging=all_packaging,
+                           low_stock_packaging=low_stock_packaging, # <-- Przekazanie do widoku
                            sort_by=sort_by,
                            order=order)
 
