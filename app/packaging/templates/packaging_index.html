@@ -2,7 +2,6 @@
 {% block title %}Magazyn Opakowań{% endblock %}
 
 {% block content %}
-    {# Dodajemy identyfikator na górze strony, do którego będą prowadzić linki "powrót" #}
     <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Magazyn Opakowań</h1>
         <a href="{{ url_for('packaging.manage_categories') }}" class="btn btn-secondary">Zarządzaj Kategoriami</a>
@@ -45,37 +44,36 @@
             </div>
         </div>
         <div class="col-md-8">
-            {# === POCZĄTEK NOWEJ SEKCJI: SZYBKA NAWIGACJA === #}
             <div class="card shadow-sm mb-4">
-                <div class="card-header">
-                    <h3>Opakowania na stanie</h3>
-                </div>
+                <div class="card-header"><h3>Opakowania na stanie</h3></div>
                 <div class="card-body">
                     <strong>Szybka nawigacja:</strong>
-                    {% for category in categories if category.packaging_items %}
-                        <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
+                    {% for category in categories %}
+                        {% set items_in_category = all_packaging | selectattr('category_id', 'equalto', category.id) | list %}
+                        {% if items_in_category %}
+                            <a href="#category-{{ category.name | lower | replace(' ', '-') }}" class="btn btn-outline-secondary btn-sm m-1">{{ category.name }}</a>
+                        {% endif %}
                     {% endfor %}
                 </div>
             </div>
-            {# === KONIEC NOWEJ SEKCJI === #}
 
-            {% for category in categories if category.packaging_items %}
-                {# Dodajemy ID do diva kategorii, aby linki mogły tu prowadzić #}
+            {% for category in categories %}
+                {% set items_in_category = all_packaging | selectattr('category_id', 'equalto', category.id) | list %}
+                {% if items_in_category %}
                 <div id="category-{{ category.name | lower | replace(' ', '-') }}" class="card shadow-sm mb-4">
-                    <div class="card-header bg-light">
-                        <h4>{{ category.name }}</h4>
-                    </div>
+                    <div class="card-header bg-light"><h4>{{ category.name }}</h4></div>
                     <div class="card-body">
                         <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
-                                    <th>Nazwa Opakowania</th>
-                                    <th class="text-center">Ilość na stanie</th>
+                                    {% set anchor_id = 'category-' + category.name|lower|replace(' ', '-') %}
+                                    <th><a href="{{ url_for('packaging.index', sort_by='name', order='desc' if sort_by == 'name' and order == 'asc' else 'asc', _anchor=anchor_id) }}">Nazwa Opakowania {% if sort_by == 'name' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
+                                    <th class="text-center"><a href="{{ url_for('packaging.index', sort_by='quantity', order='desc' if sort_by == 'quantity' and order == 'asc' else 'asc', _anchor=anchor_id) }}">Ilość na stanie {% if sort_by == 'quantity' %}{% if order == 'asc' %}&uarr;{% else %}&darr;{% endif %}{% endif %}</a></th>
                                     <th class="text-end">Akcje</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for item in category.packaging_items %}
+                                {% for item in items_in_category %}
                                 <tr class="{{ 'table-danger' if item.quantity_in_stock < item.critical_stock_level and item.critical_stock_level > 0 }}">
                                     <td>
                                         {{ item.name }}
@@ -94,13 +92,12 @@
                                 {% endfor %}
                             </tbody>
                         </table>
-                        {# === POCZĄTEK NOWEJ SEKCJI: LINK POWROTNY === #}
                         <div class="text-end mt-2">
                             <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
                         </div>
-                        {# === KONIEC NOWEJ SEKCJI === #}
                     </div>
                 </div>
+                {% endif %}
             {% endfor %}
         </div>
     </div>

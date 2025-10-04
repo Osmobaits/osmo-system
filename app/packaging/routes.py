@@ -4,6 +4,7 @@ from app.models import db, Packaging, PackagingCategory
 from flask_login import login_required
 from app.decorators import permission_required
 from sqlalchemy.orm import joinedload
+from sqlalchemy import asc, desc
 
 bp = Blueprint('packaging', __name__, template_folder='templates', url_prefix='/packaging')
 
@@ -12,26 +13,47 @@ bp = Blueprint('packaging', __name__, template_folder='templates', url_prefix='/
 @permission_required('warehouse')
 def index():
     if request.method == 'POST':
+        # Logika dodawania nowego opakowania
         name = request.form.get('name')
-        quantity = request.form.get('quantity', type=int)
-        category_id = request.form.get('category_id', type=int)
-        critical_stock_level = request.form.get('critical_stock_level', type=int) # <-- NOWA LINIA
-
-        if name and quantity is not None and quantity >= 0 and category_id and critical_stock_level is not None: # <-- ZMIANA
-            existing_packaging = Packaging.query.filter_by(name=name).first()
-            if existing_packaging:
-                flash(f"Opakowanie o nazwie '{name}' już istnieje.", "warning")
-            else:
-                new_packaging = Packaging(name=name, quantity_in_stock=quantity, category_id=category_id, critical_stock_level=critical_stock_level) # <-- ZMIANA
-                db.session.add(new_packaging)
-                db.session.commit()
-                flash(f"Dodano nowe opakowanie '{name}' na stan.", "success")
-        else:
-            flash("Wszystkie pola są wymagane.", "danger")
+        category_id = request.form.get('category_id')
+        quantity = request.form.get('quantity')
+        critical_stock_level = request.form.get('critical_stock_level')
+        
+        new_packaging = Packaging(
+            name=name,
+            category_id=int(category_id),
+            quantity_in_stock=int(quantity),
+            critical_stock_level=int(critical_stock_level)
+        )
+        db.session.add(new_packaging)
+        db.session.commit()
+        flash('Dodano nowe opakowanie na stan.', 'success')
         return redirect(url_for('packaging.index'))
 
-    categories = PackagingCategory.query.options(joinedload(PackagingCategory.packaging_items)).order_by(PackagingCategory.name).all()
-    return render_template('packaging_index.html', categories=categories)
+    # Logika wyświetlania i sortowania
+    sort_by = request.args.get('sort_by', 'name')
+    order = request.args.get('order', 'asc')
+
+    sort_map = {
+        'name': Packaging.name,
+        'quantity': Packaging.quantity_in_stock,
+    }
+    sort_column = sort_map.get(sort_by, Packaging.name)
+
+    if order == 'asc':
+        query = Packaging.query.order_by(asc(sort_column))
+    else:
+        query = Packaging.query.order_by(desc(sort_column))
+    
+    all_packaging = query.all()
+
+    categories = PackagingCategory.query.order_by(PackagingCategory.name).all()
+    
+    return render_template('packaging_index.html', 
+                           categories=categories, 
+                           all_packaging=all_packaging,
+                           sort_by=sort_by,
+                           order=order)
 
 @bp.route('/edit_stock/<int:packaging_id>', methods=['GET', 'POST'])
 @login_required

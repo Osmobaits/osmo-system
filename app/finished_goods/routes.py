@@ -14,17 +14,36 @@ bp = Blueprint('finished_goods', __name__, template_folder='templates', url_pref
 
 @bp.route('/')
 @login_required
-@permission_required('warehouse') # Używamy uprawnienia warehouse
+@permission_required('warehouse')
 def index():
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
+    
+    # --- NOWA LOGIKA SORTOWANIA ---
+    sort_by = request.args.get('sort_by', 'name')
+    order = request.args.get('order', 'asc')
 
-    # Wyszukaj produkty poniżej stanu krytycznego
-    low_stock_products = FinishedProduct.query.filter(
-        FinishedProduct.quantity_in_stock < FinishedProduct.critical_stock_level,
-        FinishedProduct.critical_stock_level > 0
-    ).all()
+    sort_map = {
+        'name': FinishedProduct.name,
+        'quantity': FinishedProduct.quantity_in_stock,
+    }
+    sort_column = sort_map.get(sort_by, FinishedProduct.name)
 
-    return render_template('finished_goods_index.html', categories=categories, low_stock_products=low_stock_products)
+    if order == 'asc':
+        query = FinishedProduct.query.order_by(asc(sort_column))
+    else:
+        query = FinishedProduct.query.order_by(desc(sort_column))
+    
+    all_products = query.all()
+    # --------------------------------
+
+    low_stock_products = [p for p in all_products if p.critical_stock_level > 0 and p.quantity_in_stock < p.critical_stock_level]
+    
+    return render_template('finished_goods_index.html', 
+                           categories=categories, 
+                           all_products=all_products,
+                           low_stock_products=low_stock_products,
+                           sort_by=sort_by,
+                           order=order)
 
 @bp.route('/edit_stock/<int:product_id>', methods=['GET', 'POST'])
 @login_required
