@@ -27,6 +27,22 @@
                 {% endfor %}
             </div>
         </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Niskie Stany Surowców ({{ low_stock_materials|length }})</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for material in low_stock_materials %}
+                <a href="{{ url_for('warehouse.index') }}#category-{{ material.category.name | lower | replace(' ', '-') }}" class="list-group-item list-group-item-action">
+                    <strong>{{ material.name }}</strong>
+                    <span class="float-end">Stan: {{ "%.2f"|format(material.current_stock) }} / Krytyczny: {{ material.critical_stock_level }}</span>
+                </a>
+                {% else %}
+                <div class="list-group-item text-center text-muted">Wszystkie stany surowców w normie.</div>
+                {% endfor %}
+            </div>
+        </div>
         <div class="card shadow-sm mb-4">
     <div class="card-header bg-danger text-white">
         <h5 class="mb-0">Niskie Stany Produktów Gotowych ({{ low_stock_finished_products|length }})</h5>
@@ -58,21 +74,7 @@
             </div>
         </div>
     </div>
-    <div class="card shadow-sm mb-4">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0">Niskie Stany Surowców ({{ low_stock_materials|length }})</h5>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for material in low_stock_materials %}
-                <a href="{{ url_for('warehouse.index') }}#category-{{ material.category.name | lower | replace(' ', '-') }}" class="list-group-item list-group-item-action">
-                    <strong>{{ material.name }}</strong>
-                    <span class="float-end">Stan: {{ "%.2f"|format(material.current_stock) }} / Krytyczny: {{ material.critical_stock_level }}</span>
-                </a>
-                {% else %}
-                <div class="list-group-item text-center text-muted">Wszystkie stany surowców w normie.</div>
-                {% endfor %}
-            </div>
-        </div>
+
     <div class="col-md-6">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-success text-white">
