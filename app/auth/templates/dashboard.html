@@ -43,7 +43,21 @@
                 {% endfor %}
             </div>
         </div>
-
+        <div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">Niskie Stany Produktów Gotowych ({{ low_stock_finished_products|length }})</h5>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for product in low_stock_finished_products %}
+        <a href="{{ url_for('finished_goods.index') }}#category-{{ product.category.name | lower | replace(' ', '-') }}" class="list-group-item list-group-item-action">
+            <strong>{{ product.name }}</strong>
+            <span class="float-end">Stan: {{ product.quantity_in_stock }} / Krytyczny: {{ product.critical_stock_level }}</span>
+        </a>
+        {% else %}
+        <div class="list-group-item text-center text-muted">Wszystkie stany produktów w normie.</div>
+        {% endfor %}
+    </div>
+</div>
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">Niskie Stany Opakowań ({{ low_stock_packaging|length }})</h5>

@@ -120,6 +120,7 @@ class FinishedProduct(db.Model):
     packaging_weight_kg = db.Column(db.Float, nullable=False, default=1.0)
     unit = db.Column(db.String(10), nullable=False, server_default='szt.')
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
+    critical_stock_level = db.Column(db.Integer, nullable=False, default=0)
     recipe_components = db.relationship('RecipeComponent', foreign_keys='RecipeComponent.finished_product_id', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
     packaging_bill = db.relationship('ProductPackaging', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")

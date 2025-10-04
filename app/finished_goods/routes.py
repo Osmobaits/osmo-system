@@ -14,12 +14,17 @@ bp = Blueprint('finished_goods', __name__, template_folder='templates', url_pref
 
 @bp.route('/')
 @login_required
-@permission_required('warehouse')
+@permission_required('warehouse') # Używamy uprawnienia warehouse
 def index():
-    categories = FinishedProductCategory.query.options(
-        joinedload(FinishedProductCategory.finished_products)
-    ).order_by(FinishedProductCategory.name).all()
-    return render_template('finished_goods_index.html', categories=categories)
+    categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
+
+    # Wyszukaj produkty poniżej stanu krytycznego
+    low_stock_products = FinishedProduct.query.filter(
+        FinishedProduct.quantity_in_stock < FinishedProduct.critical_stock_level,
+        FinishedProduct.critical_stock_level > 0
+    ).all()
+
+    return render_template('finished_goods_index.html', categories=categories, low_stock_products=low_stock_products)
 
 @bp.route('/edit_stock/<int:product_id>', methods=['GET', 'POST'])
 @login_required
@@ -27,15 +32,11 @@ def index():
 def edit_product_stock(product_id):
     product = FinishedProduct.query.get_or_404(product_id)
     if request.method == 'POST':
-        new_quantity = request.form.get('quantity_in_stock', type=int)
-        if new_quantity is not None and new_quantity >= 0:
-            product.quantity_in_stock = new_quantity
-            db.session.commit()
-            flash(f"Zaktualizowano stan magazynowy dla produktu '{product.name}'.", "success")
-            return redirect(url_for('finished_goods.index'))
-        else:
-            flash("Podano nieprawidłową wartość.", "danger")
-    
+        product.quantity_in_stock = request.form.get('quantity_in_stock', type=int)
+        product.critical_stock_level = request.form.get('critical_stock_level', type=int)
+        db.session.commit()
+        flash(f"Zaktualizowano dane dla produktu '{product.name}'.", 'success')
+        return redirect(url_for('finished_goods.index'))
     return render_template('edit_fp_stock.html', product=product)
 
 # === POCZĄTEK PRZEBUDOWY: LOGIKA FIFO DLA ZDUPLIKOWANYCH KODÓW ===

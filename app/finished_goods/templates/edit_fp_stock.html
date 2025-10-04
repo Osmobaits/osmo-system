@@ -6,7 +6,7 @@
     <div class="col-md-6">
         <div class="card shadow-sm">
             <div class="card-header">
-                <h3>Edytuj stan magazynowy</h3>
+                <h3>Edytuj dane produktu</h3>
             </div>
             <div class="card-body">
                 <p class="fs-5"><strong>Produkt:</strong> {{ product.name }}</p>
@@ -15,6 +15,10 @@
                     <div class="mb-3">
                         <label for="quantity_in_stock" class="form-label">Nowa ilość na stanie (w opakowaniach):</label>
                         <input type="number" class="form-control" id="quantity_in_stock" name="quantity_in_stock" value="{{ product.quantity_in_stock }}" required min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="critical_stock_level" class="form-label">Poziom krytyczny (alarm przy mniejszej ilości):</label>
+                        <input type="number" class="form-control" id="critical_stock_level" name="critical_stock_level" value="{{ product.critical_stock_level }}" required min="0">
                     </div>
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary">Zapisz zmiany</button>

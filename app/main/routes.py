@@ -1,14 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for
 from flask_login import login_required, current_user
-from app.models import db, RawMaterial, Packaging, Order, ProductionOrder, Task, VacationRequest
+from app.models import db, RawMaterial, Packaging, FinishedProduct, Order, ProductionOrder, Task, VacationRequest
 
 bp = Blueprint('main', __name__)
 
-@bp.route('/')
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    # --- MODUŁ MAGAZYN SUROWCÓW ---
+    # --- MAGAZYN SUROWCÓW ---
     low_stock_materials = []
     all_materials = RawMaterial.query.all()
     for material in all_materials:
@@ -17,23 +16,29 @@ def dashboard():
             material.current_stock = current_stock
             low_stock_materials.append(material)
 
-    # --- MODUŁ MAGAZYN OPAKOWAŃ (NOWOŚĆ) ---
+    # --- MAGAZYN OPAKOWAŃ ---
     low_stock_packaging = Packaging.query.filter(
         Packaging.quantity_in_stock < Packaging.critical_stock_level,
         Packaging.critical_stock_level > 0
     ).order_by(Packaging.name).all()
 
-    # --- MODUŁ ZAMÓWIENIA ---
+    # --- MAGAZYN PRODUKTÓW GOTOWYCH ---
+    low_stock_finished_products = FinishedProduct.query.filter(
+        FinishedProduct.quantity_in_stock < FinishedProduct.critical_stock_level,
+        FinishedProduct.critical_stock_level > 0
+    ).order_by(FinishedProduct.name).all()
+
+    # --- ZAMÓWIENIA ---
     active_orders = Order.query.filter_by(is_archived=False).order_by(Order.order_date.desc()).limit(5).all()
     orders_to_invoice = Order.query.filter_by(is_archived=True, invoice_number=None).order_by(Order.order_date.desc()).limit(5).all()
 
-    # --- MODUŁ PRODUKCJA ---
+    # --- PRODUKCJA ---
     open_production_orders = ProductionOrder.query.filter(ProductionOrder.quantity_produced == 0).order_by(ProductionOrder.order_date.desc()).limit(5).all()
 
-    # --- MODUŁ ZADANIA ---
+    # --- ZADANIA ---
     new_tasks_for_user = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').order_by(Task.creation_date.desc()).all()
 
-    # --- MODUŁ URLOPY (tylko dla admina) ---
+    # --- URLOPY (tylko dla admina) ---
     pending_vacations = []
     if current_user.has_role('admin'):
         pending_vacations = VacationRequest.query.filter_by(status='Oczekuje').order_by(VacationRequest.request_date.asc()).all()
@@ -42,6 +47,7 @@ def dashboard():
         'dashboard.html',
         low_stock_materials=low_stock_materials,
         low_stock_packaging=low_stock_packaging,
+        low_stock_finished_products=low_stock_finished_products,
         active_orders=active_orders,
         orders_to_invoice=orders_to_invoice,
         open_production_orders=open_production_orders,
