@@ -4,6 +4,12 @@ from app.models import db, RawMaterial, Packaging, FinishedProduct, Order, Produ
 
 bp = Blueprint('main', __name__)
 
+@bp.route('/')
+@login_required
+def index():
+    # Ta funkcja będzie teraz stroną główną i zawsze przekieruje do panelu
+    return redirect(url_for('main.dashboard'))
+
 @bp.route('/dashboard')
 @login_required
 def dashboard():
@@ -54,8 +60,3 @@ def dashboard():
         new_tasks_for_user=new_tasks_for_user,
         pending_vacations=pending_vacations
     )
-
-@bp.route('/home')
-@login_required
-def home():
-    return redirect(url_for('main.dashboard'))
