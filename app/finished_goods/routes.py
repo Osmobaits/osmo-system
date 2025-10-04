@@ -9,6 +9,8 @@ import io
 import re
 from datetime import datetime
 from markupsafe import Markup
+from sqlalchemy import asc, desc
+
 
 bp = Blueprint('finished_goods', __name__, template_folder='templates', url_prefix='/finished_goods')
 
