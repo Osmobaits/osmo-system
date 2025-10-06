@@ -49,7 +49,6 @@ def manage_catalogue():
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
     return render_template('manage_catalogue.html', categories=categories)
 
-
 @bp.route('/catalogue/edit/<int:id>', methods=['POST'])
 @login_required
 @permission_required('production')
