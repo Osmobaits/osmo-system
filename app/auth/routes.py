@@ -22,7 +22,7 @@ def login():
 
             # Logowanie aktywności
             log_activity("Zalogował się do systemu.")
-            db.session.commit() # Commit jest potrzebny, aby zapisać log przed przekierowaniem
+           
             
             flash('Zalogowano pomyślnie!', 'success')
             return redirect(url_for('main.dashboard'))
@@ -36,7 +36,6 @@ def login():
 def logout():
     # Logowanie aktywności PRZED wylogowaniem
     log_activity("Wylogował się z systemu.")
-    db.session.commit() # Commit jest potrzebny, bo sesja użytkownika zaraz wygaśnie
 
     logout_user()
     flash('Wylogowano pomyślnie.', 'info')

@@ -25,3 +25,4 @@ def log_activity(action, url_endpoint=None, **url_params):
         url=log_url
     )
     db.session.add(log_entry)
+    db.session.commit() # <-- NAJWAŻNIEJSZA ZMIANA: ZAPIS DO BAZY
