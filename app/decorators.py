@@ -17,7 +17,7 @@ def permission_required(permission):
             if not current_user.has_role(permission):
                 flash('Brak uprawnień do dostępu do tej strony.', 'danger')
                 # POPRAWKA: Przekierowujemy na bezpieczną stronę główną
-                return redirect(url_for('main.home')) 
+                return redirect(url_for('main.index')) 
             
             return f(*args, **kwargs)
         return decorated_function
