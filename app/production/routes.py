@@ -176,40 +176,50 @@ def manage_production_orders():
         missing_components = []
         missing_packaging = []
 
+        # --- FUNKCJA POMOCNICZA DO KONWERSJI JEDNOSTEK ---
+        def convert_to_kg(quantity, unit):
+            unit = unit.lower()
+            if unit == 'kg':
+                return quantity
+            elif unit in ['g', 'ml']: # Zakładamy, że 1ml ~ 1g
+                return quantity / 1000.0
+            return 0 # Ignorujemy jednostki, których nie da się przeliczyć na wagę, np. 'szt.'
+
         # === KROK 1: WERYFIKACJA SUROWCÓW I PÓŁPRODUKTÓW ===
         total_recipe_weight_kg = 0.0
         for component in product.recipe_components:
             # Obliczanie wagi receptury z uwzględnieniem jednostek
-            quantity_kg = component.quantity_required
-            if component.unit == 'g':
-                quantity_kg /= 1000
-            elif component.unit == 'ml':
-                quantity_kg /= 1000 # Założenie, że 1ml ~ 1g
+            component_weight_kg = convert_to_kg(component.quantity_required, component.unit)
+            total_recipe_weight_kg += component_weight_kg
             
-            if component.unit in ['kg', 'g', 'ml']:
-                 total_recipe_weight_kg += quantity_kg
-            
-            required_quantity = component.quantity_required * batch_size
-            
-            if component.raw_material:
-                total_stock = sum(batch.quantity_on_hand for batch in component.raw_material.batches)
-                if total_stock < required_quantity:
-                    missing_components.append(f"{component.raw_material.name} (brakuje: {required_quantity - total_stock:.2f} {component.unit})")
-            
-            elif component.sub_product:
-                if component.sub_product.quantity_in_stock < required_quantity:
-                    missing_components.append(f"{component.sub_product.name} (brakuje: {required_quantity - component.sub_product.quantity_in_stock:.2f} {component.unit})")
+            # Wymagana ilość w oryginalnej jednostce receptury
+            required_quantity_orig_unit = component.quantity_required * batch_size
 
-        # === NOWA, POPRAWNA LOGIKA OBLICZANIA PLANOWANEJ ILOŚCI ===
+            # Sprawdzenie surowców
+            if component.raw_material:
+                # Oblicz łączny stan magazynowy surowca w KG
+                total_stock_kg = sum(convert_to_kg(batch.quantity_on_hand, batch.unit) for batch in component.raw_material.batches)
+                
+                # Przelicz wymaganą ilość na KG, aby móc je porównać
+                required_quantity_kg = convert_to_kg(required_quantity_orig_unit, component.unit)
+
+                if total_stock_kg < required_quantity_kg:
+                    shortage_kg = required_quantity_kg - total_stock_kg
+                    missing_components.append(f"{component.raw_material.name} (brakuje: {shortage_kg:.3f} kg)")
+            
+            # Sprawdzenie półproduktów (zakładamy, że ich jednostka to 'szt.')
+            elif component.sub_product:
+                if component.sub_product.quantity_in_stock < required_quantity_orig_unit:
+                    missing_components.append(f"{component.sub_product.name} (brakuje: {int(required_quantity_orig_unit - component.sub_product.quantity_in_stock)} szt.)")
+        
+        # Obliczanie planowanej ilości
         planned_quantity = 0
         if product.packaging_weight_kg > 0:
             total_production_weight = total_recipe_weight_kg * batch_size
             planned_quantity = int(total_production_weight / product.packaging_weight_kg)
         else:
-            # Jeśli waga opakowania to 0, użyj mnożnika jako ilości sztuk
             planned_quantity = batch_size
-        # ==========================================================
-
+        
         # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
@@ -229,7 +239,7 @@ def manage_production_orders():
         # === KROK 4: WYSTARCZAJĄCE ZASOBY - ROZPOCZNIJ PRODUKCJĘ ===
         new_order = ProductionOrder(
             finished_product_id=product.id,
-            planned_quantity=planned_quantity, # <-- Użycie nowej, poprawnej wartości
+            planned_quantity=planned_quantity,
             quantity_produced=0,
             sample_required=False 
         )
@@ -241,16 +251,26 @@ def manage_production_orders():
             required_quantity = component.quantity_required * batch_size
             
             if component.raw_material:
+                # Logika FIFO - pobieraj z najstarszych partii
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
+                temp_required = convert_to_kg(required_quantity, component.unit)
+
                 for batch in batches:
-                    if required_quantity <= 0: break
-                    take_qty = min(batch.quantity_on_hand, required_quantity)
-                    batch.quantity_on_hand -= take_qty
+                    if temp_required <= 0: break
                     
-                    log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=take_qty)
+                    batch_qty_kg = convert_to_kg(batch.quantity_on_hand, batch.unit)
+                    take_qty_kg = min(batch_qty_kg, temp_required)
+                    
+                    # Oblicz, ile jednostek oryginalnych to stanowi
+                    # To jest skomplikowane jeśli jednostki są różne, upraszczamy do KG
+                    original_units_to_take = (take_qty_kg / batch_qty_kg) * batch.quantity_on_hand if batch_qty_kg > 0 else 0
+                    
+                    batch.quantity_on_hand -= original_units_to_take
+                    
+                    log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=original_units_to_take)
                     db.session.add(log)
                     
-                    required_quantity -= take_qty
+                    temp_required -= take_qty_kg
             
             elif component.sub_product:
                 component.sub_product.quantity_in_stock -= required_quantity
