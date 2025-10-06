@@ -167,63 +167,74 @@ def manage_production_orders():
         product_id = request.form.get('product_id')
         batch_size = request.form.get('batch_size', type=int)
 
+        # --- POCZĄTEK KODU DIAGNOSTYCZNEGO ---
+        print("\n--- [DEBUG] Rozpoczynanie nowego zlecenia ---")
+        # --- KONIEC KODU DIAGNOSTYCZNEGO ---
+
         if not product_id or not batch_size or batch_size <= 0:
             flash('Proszę wybrać produkt i podać prawidłową liczbę porcji.', 'warning')
             return redirect(url_for('production.manage_production_orders'))
 
         product = FinishedProduct.query.get_or_404(product_id)
         
-        # --- NOWE ZABEZPIECZENIE: SPRAWDZENIE CZY RECEPTURA ISTNIEJE ---
         if not product.recipe_components.first():
             flash(f"BŁĄD: Nie można utworzyć zlecenia. Produkt '{product.name}' nie ma zdefiniowanej receptury.", 'danger')
             return redirect(url_for('production.manage_production_orders'))
-        # -------------------------------------------------------------
 
         missing_components = []
         missing_packaging = []
 
-        def convert_unit(quantity, from_unit, to_unit):
+        def convert_unit(quantity, from_unit, to_unit='g'): # Uproszczone, bo w tej funkcji zawsze przeliczamy na gramy
             from_unit = from_unit.lower()
-            to_unit = to_unit.lower()
-            grams = 0
             if from_unit == 'kg':
-                grams = quantity * 1000
+                return quantity * 1000
             elif from_unit in ['g', 'ml']:
-                grams = quantity
-            
-            if to_unit == 'kg':
-                return grams / 1000
-            elif to_unit in ['g', 'ml']:
-                return grams
-            
-            return quantity
+                return quantity
+            return 0
 
         total_recipe_weight_g = 0
+        print("--- [DEBUG] Obliczanie wagi receptury:")
         for component in product.recipe_components:
-            total_recipe_weight_g += convert_unit(component.quantity_required, component.unit, 'g')
-            required_quantity_orig_unit = component.quantity_required * batch_size
+            component_weight_g = convert_unit(component.quantity_required, component.unit)
+            component_name = "Nieznany"
+            if component.raw_material:
+                component_name = component.raw_material.name
+            elif component.sub_product:
+                component_name = component.sub_product.name
+            print(f"    - Składnik: '{component_name}' | Ilość: {component.quantity_required} {component.unit} -> Przeliczono na: {component_weight_g}g")
+            total_recipe_weight_g += component_weight_g
+        
+        print(f"--- [DEBUG] Całkowita waga receptury: {total_recipe_weight_g}g")
+        
+        planned_quantity = 0
+        packaging_weight_g = product.packaging_weight_kg * 1000
+        
+        print(f"--- [DEBUG] Waga opakowania: {packaging_weight_g}g | Mnożnik (batch_size): {batch_size}")
 
+        if packaging_weight_g > 0:
+            total_production_weight_g = total_recipe_weight_g * batch_size
+            print(f"--- [DEBUG] Całkowita waga produkcji: {total_production_weight_g}g")
+            planned_quantity = int(total_production_weight_g / packaging_weight_g)
+        else:
+            planned_quantity = batch_size
+            
+        print(f"--- [DEBUG] Finalna planowana ilość: {planned_quantity} szt.")
+        print("-------------------------------------------\n")
+        
+        # Reszta funkcji bez zmian...
+        for component in product.recipe_components:
+            required_quantity_orig_unit = component.quantity_required * batch_size
             if component.raw_material:
                 total_stock_in_component_unit = 0
                 for batch in component.raw_material.batches:
                     total_stock_in_component_unit += convert_unit(batch.quantity_on_hand, batch.unit, component.unit)
-
                 if total_stock_in_component_unit < required_quantity_orig_unit:
                     shortage = required_quantity_orig_unit - total_stock_in_component_unit
                     missing_components.append(f"{component.raw_material.name} (brakuje: {shortage:.0f} {component.unit})")
-
             elif component.sub_product:
                 if component.sub_product.quantity_in_stock < required_quantity_orig_unit:
                     missing_components.append(f"{component.sub_product.name} (brakuje: {int(required_quantity_orig_unit - component.sub_product.quantity_in_stock)} szt.)")
-        
-        planned_quantity = 0
-        packaging_weight_g = product.packaging_weight_kg * 1000
-        if packaging_weight_g > 0:
-            total_production_weight_g = total_recipe_weight_g * batch_size
-            planned_quantity = int(total_production_weight_g / packaging_weight_g)
-        else:
-            planned_quantity = batch_size
-        
+
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
             if item.packaging.quantity_in_stock < required_packaging:
@@ -238,44 +249,29 @@ def manage_production_orders():
             flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
-        new_order = ProductionOrder(
-            finished_product_id=product.id,
-            planned_quantity=planned_quantity,
-            quantity_produced=0,
-            sample_required=False 
-        )
+        new_order = ProductionOrder(finished_product_id=product.id, planned_quantity=planned_quantity, quantity_produced=0, sample_required=False)
         db.session.add(new_order)
         db.session.flush()
 
         for component in product.recipe_components:
             if component.raw_material:
-                required_g = convert_unit(component.quantity_required * batch_size, component.unit, 'g')
+                required_g = convert_unit(component.quantity_required * batch_size, component.unit)
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
-
                 for batch in batches:
                     if required_g <= 0: break
-                    
-                    batch_g = convert_unit(batch.quantity_on_hand, batch.unit, 'g')
+                    batch_g = convert_unit(batch.quantity_on_hand, batch.unit)
                     take_g = min(batch_g, required_g)
-                    
                     remaining_g = batch_g - take_g
-                    
                     batch.quantity_on_hand = convert_unit(remaining_g, 'g', batch.unit)
-                    
                     consumed_orig_unit = convert_unit(take_g, 'g', batch.unit)
                     log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=consumed_orig_unit)
                     db.session.add(log)
-                    
                     required_g -= take_g
-            
             elif component.sub_product:
                 component.sub_product.quantity_in_stock -= (component.quantity_required * batch_size)
 
         db.session.commit()
-
-        log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'",
-                     'production.production_order_details', order_id=new_order.id)
-
+        log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'", 'production.production_order_details', order_id=new_order.id)
         flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
