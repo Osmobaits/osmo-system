@@ -176,23 +176,40 @@ def manage_production_orders():
         missing_packaging = []
 
         # === KROK 1: WERYFIKACJA SUROWCÓW I PÓŁPRODUKTÓW ===
+        total_recipe_weight_kg = 0.0
         for component in product.recipe_components:
+            # Obliczanie wagi receptury z uwzględnieniem jednostek
+            quantity_kg = component.quantity_required
+            if component.unit == 'g':
+                quantity_kg /= 1000
+            elif component.unit == 'ml':
+                quantity_kg /= 1000 # Założenie, że 1ml ~ 1g
+            
+            if component.unit in ['kg', 'g', 'ml']:
+                 total_recipe_weight_kg += quantity_kg
+            
             required_quantity = component.quantity_required * batch_size
             
-            # Sprawdzenie surowców
             if component.raw_material:
                 total_stock = sum(batch.quantity_on_hand for batch in component.raw_material.batches)
                 if total_stock < required_quantity:
                     missing_components.append(f"{component.raw_material.name} (brakuje: {required_quantity - total_stock:.2f} {component.unit})")
             
-            # Sprawdzenie półproduktów
             elif component.sub_product:
                 if component.sub_product.quantity_in_stock < required_quantity:
                     missing_components.append(f"{component.sub_product.name} (brakuje: {required_quantity - component.sub_product.quantity_in_stock:.2f} {component.unit})")
 
+        # === NOWA, POPRAWNA LOGIKA OBLICZANIA PLANOWANEJ ILOŚCI ===
+        planned_quantity = 0
+        if product.packaging_weight_kg > 0:
+            total_production_weight = total_recipe_weight_kg * batch_size
+            planned_quantity = int(total_production_weight / product.packaging_weight_kg)
+        else:
+            # Jeśli waga opakowania to 0, użyj mnożnika jako ilości sztuk
+            planned_quantity = batch_size
+        # ==========================================================
+
         # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
-        # Zakładamy, że ilość opakowań jest na jedną sztukę produktu, więc mnożymy ją przez planowaną ilość
-        planned_quantity = batch_size # Uproszczenie, jeśli 1 wsad = 1 sztuka
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
             if item.packaging.quantity_in_stock < required_packaging:
@@ -211,7 +228,7 @@ def manage_production_orders():
         # === KROK 4: WYSTARCZAJĄCE ZASOBY - ROZPOCZNIJ PRODUKCJĘ ===
         new_order = ProductionOrder(
             finished_product_id=product.id,
-            planned_quantity=planned_quantity,
+            planned_quantity=planned_quantity, # <-- Użycie nowej, poprawnej wartości
             quantity_produced=0,
             sample_required=False 
         )
@@ -223,7 +240,6 @@ def manage_production_orders():
             required_quantity = component.quantity_required * batch_size
             
             if component.raw_material:
-                # Logika FIFO - pobieraj z najstarszych partii
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
                 for batch in batches:
                     if required_quantity <= 0: break
@@ -237,7 +253,6 @@ def manage_production_orders():
             
             elif component.sub_product:
                 component.sub_product.quantity_in_stock -= required_quantity
-                # Tu można dodać logikę ProductionLog dla półproduktów, jeśli potrzebna
 
         db.session.commit()
 
