@@ -1,6 +1,7 @@
 # app/production/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, Markup
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app.models import db, FinishedProduct, RawMaterial, RecipeComponent, ProductionOrder, RawMaterialBatch, ProductionLog, FinishedProductCategory, Packaging, ProductPackaging
+from markupsafe import Markup
 from flask_login import login_required
 from app.decorators import permission_required
 import math
