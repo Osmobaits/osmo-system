@@ -176,54 +176,64 @@ def manage_production_orders():
         missing_components = []
         missing_packaging = []
 
-        def convert_to_kg(quantity, unit):
-            unit = unit.lower()
-            if unit == 'kg':
-                return quantity
-            elif unit in ['g', 'ml']:
-                return quantity / 1000.0
-            return 0
+        # --- FUNKCJA POMOCNICZA DO KONWERSJI JEDNOSTEK ---
+        def convert_unit(quantity, from_unit, to_unit):
+            from_unit = from_unit.lower()
+            to_unit = to_unit.lower()
 
-        total_recipe_weight_kg = 0.0
+            # Najpierw przelicz wszystko na gramy
+            grams = 0
+            if from_unit == 'kg':
+                grams = quantity * 1000
+            elif from_unit in ['g', 'ml']:
+                grams = quantity
+            
+            # Teraz przelicz z gramów na jednostkę docelową
+            if to_unit == 'kg':
+                return grams / 1000
+            elif to_unit in ['g', 'ml']:
+                return grams
+            
+            return quantity # Zwróć oryginał, jeśli jednostki nie są wagowe (np. szt.)
+
+        # === KROK 1: WERYFIKACJA SUROWCÓW ===
+        total_recipe_weight_g = 0
         for component in product.recipe_components:
-            component_weight_kg = convert_to_kg(component.quantity_required, component.unit)
-            total_recipe_weight_kg += component_weight_kg
+            # Obliczanie wagi receptury w gramach
+            total_recipe_weight_g += convert_unit(component.quantity_required, component.unit, 'g')
             
             required_quantity_orig_unit = component.quantity_required * batch_size
 
             if component.raw_material:
-                total_stock_kg = sum(convert_to_kg(batch.quantity_on_hand, batch.unit) for batch in component.raw_material.batches)
-                required_quantity_kg = convert_to_kg(required_quantity_orig_unit, component.unit)
+                # Oblicz łączny stan magazynowy surowca w JEDNOSTCE RECEPTURY
+                total_stock_in_component_unit = 0
+                for batch in component.raw_material.batches:
+                    total_stock_in_component_unit += convert_unit(batch.quantity_on_hand, batch.unit, component.unit)
 
-                if total_stock_kg < required_quantity_kg:
-                    shortage_kg = required_quantity_kg - total_stock_kg
-                    
-                    # --- POPRAWIONA LOGIKA WYŚWIETLANIA BŁĘDU ---
-                    display_shortage = shortage_kg
-                    display_unit = 'kg'
-                    if component.unit.lower() in ['g', 'ml']:
-                        display_shortage = shortage_kg * 1000
-                        display_unit = component.unit
-                    
-                    missing_components.append(f"{component.raw_material.name} (brakuje: {display_shortage:.0f} {display_unit})")
-                    # ---------------------------------------------
+                if total_stock_in_component_unit < required_quantity_orig_unit:
+                    shortage = required_quantity_orig_unit - total_stock_in_component_unit
+                    missing_components.append(f"{component.raw_material.name} (brakuje: {shortage:.0f} {component.unit})")
 
             elif component.sub_product:
                 if component.sub_product.quantity_in_stock < required_quantity_orig_unit:
                     missing_components.append(f"{component.sub_product.name} (brakuje: {int(required_quantity_orig_unit - component.sub_product.quantity_in_stock)} szt.)")
         
+        # === OBLICZANIE PLANOWANEJ ILOŚCI (NA GRAMACH) ===
         planned_quantity = 0
-        if product.packaging_weight_kg > 0:
-            total_production_weight = total_recipe_weight_kg * batch_size
-            planned_quantity = int(total_production_weight / product.packaging_weight_kg)
+        packaging_weight_g = product.packaging_weight_kg * 1000
+        if packaging_weight_g > 0:
+            total_production_weight_g = total_recipe_weight_g * batch_size
+            planned_quantity = int(total_production_weight_g / packaging_weight_g)
         else:
             planned_quantity = batch_size
         
+        # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
             if item.packaging.quantity_in_stock < required_packaging:
                 missing_packaging.append(f"{item.packaging.name} (brakuje: {required_packaging - item.packaging.quantity_in_stock})")
 
+        # === KROK 3: OBSŁUGA BRAKÓW ===
         if missing_components or missing_packaging:
             error_message = "Brak wystarczających zasobów do rozpoczęcia produkcji. Brakuje:<br>"
             if missing_components:
@@ -233,6 +243,7 @@ def manage_production_orders():
             flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
+        # === KROK 4: ODEJMOWANIE ZASOBÓW ===
         new_order = ProductionOrder(
             finished_product_id=product.id,
             planned_quantity=planned_quantity,
@@ -243,29 +254,30 @@ def manage_production_orders():
         db.session.flush()
 
         for component in product.recipe_components:
-            required_quantity = component.quantity_required * batch_size
-            
             if component.raw_material:
+                required_g = convert_unit(component.quantity_required * batch_size, component.unit, 'g')
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
-                temp_required_kg = convert_to_kg(required_quantity, component.unit)
 
                 for batch in batches:
-                    if temp_required_kg <= 0: break
+                    if required_g <= 0: break
                     
-                    batch_qty_kg = convert_to_kg(batch.quantity_on_hand, batch.unit)
-                    take_qty_kg = min(batch_qty_kg, temp_required_kg)
+                    batch_g = convert_unit(batch.quantity_on_hand, batch.unit, 'g')
+                    take_g = min(batch_g, required_g)
                     
-                    original_units_to_take = (take_qty_kg / batch_qty_kg) * batch.quantity_on_hand if batch_qty_kg > 0 else 0
+                    remaining_g = batch_g - take_g
                     
-                    batch.quantity_on_hand -= original_units_to_take
+                    # Przelicz z powrotem na oryginalną jednostkę partii
+                    batch.quantity_on_hand = convert_unit(remaining_g, 'g', batch.unit)
                     
-                    log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=original_units_to_take)
+                    # Zapisz w logu ile oryginalnych jednostek zużyto z tej partii
+                    consumed_orig_unit = convert_unit(take_g, 'g', batch.unit)
+                    log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=consumed_orig_unit)
                     db.session.add(log)
                     
-                    temp_required_kg -= take_qty_kg
+                    required_g -= take_g
             
             elif component.sub_product:
-                component.sub_product.quantity_in_stock -= required_quantity
+                component.sub_product.quantity_in_stock -= (component.quantity_required * batch_size)
 
         db.session.commit()
 
@@ -275,6 +287,7 @@ def manage_production_orders():
         flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
+    # Kod dla metody GET (wyświetlanie strony)
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('production_orders.html', products=products, orders=orders)
