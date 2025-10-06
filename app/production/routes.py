@@ -24,33 +24,29 @@ def manage_catalogue():
     if request.method == 'POST':
         name = request.form.get('name')
         product_code = request.form.get('product_code')
+        category_id = request.form.get('category_id')
         packaging_weight = request.form.get('packaging_weight', type=float)
         unit = request.form.get('unit')
-        category_id = request.form.get('category_id', type=int)
-        
-        existing_by_name = FinishedProduct.query.filter_by(name=name).first()
-        if existing_by_name:
-            flash(f"Produkt o nazwie '{name}' już istnieje w katalogu.", "warning")
-            return redirect(url_for('production.manage_catalogue'))
 
-        if name and packaging_weight and category_id and unit:
-            new_product = FinishedProduct(
-                name=name, 
-                product_code=product_code, 
-                packaging_weight_kg=packaging_weight, 
-                unit=unit,
-                category_id=category_id
-            )
-            db.session.add(new_product)
-            db.session.commit()
-            flash(f"Dodano produkt '{name}' do katalogu.", "success")
+        # --- NOWA LOGIKA KONWERSJI ---
+        weight_in_kg = packaging_weight
+        if unit.lower() in ['g', 'ml']:
+            weight_in_kg = packaging_weight / 1000.0
+        # ----------------------------
+
+        new_product = FinishedProduct(
+            name=name,
+            product_code=product_code,
+            category_id=int(category_id),
+            packaging_weight_kg=weight_in_kg, # Użycie przeliczonej wartości
+            unit=unit
+        )
+        db.session.add(new_product)
+        db.session.commit()
+        flash('Dodano nowy produkt do katalogu.', 'success')
         return redirect(url_for('production.manage_catalogue'))
-    
-    from sqlalchemy.orm import joinedload
-    categories = FinishedProductCategory.query.options(
-        joinedload(FinishedProductCategory.finished_products)
-    ).order_by(FinishedProductCategory.name).all()
-    
+
+    categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
     return render_template('manage_catalogue.html', categories=categories)
 
 @bp.route('/catalogue/check_code')
@@ -72,11 +68,22 @@ def edit_catalogue_product(id):
     product = FinishedProduct.query.get_or_404(id)
     product.name = request.form.get('name')
     product.product_code = request.form.get('product_code')
-    product.packaging_weight_kg = request.form.get('packaging_weight', type=float)
-    product.unit = request.form.get('unit')
-    product.category_id = request.form.get('category_id', type=int)
+    product.category_id = int(request.form.get('category_id'))
+    
+    packaging_weight = request.form.get('packaging_weight', type=float)
+    unit = request.form.get('unit')
+
+    # --- NOWA LOGIKA KONWERSJI ---
+    weight_in_kg = packaging_weight
+    if unit.lower() in ['g', 'ml']:
+        weight_in_kg = packaging_weight / 1000.0
+    # ----------------------------
+    
+    product.packaging_weight_kg = weight_in_kg # Użycie przeliczonej wartości
+    product.unit = unit
+    
     db.session.commit()
-    flash("Zapisano zmiany w produkcie.", "success")
+    flash(f"Zaktualizowano produkt '{product.name}'.", 'success')
     return redirect(url_for('production.manage_catalogue'))
 
 
