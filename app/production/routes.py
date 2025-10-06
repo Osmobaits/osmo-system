@@ -49,6 +49,32 @@ def manage_catalogue():
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
     return render_template('manage_catalogue.html', categories=categories)
 
+
+@bp.route('/catalogue/edit/<int:id>', methods=['POST'])
+@login_required
+@permission_required('production')
+def edit_catalogue_product(id):
+    product = FinishedProduct.query.get_or_404(id)
+    product.name = request.form.get('name')
+    product.product_code = request.form.get('product_code')
+    product.category_id = int(request.form.get('category_id'))
+    
+    packaging_weight = request.form.get('packaging_weight', type=float)
+    unit = request.form.get('unit')
+
+    # --- NOWA LOGIKA KONWERSJI ---
+    weight_in_kg = packaging_weight
+    if unit.lower() in ['g', 'ml']:
+        weight_in_kg = packaging_weight / 1000.0
+    # ----------------------------
+    
+    product.packaging_weight_kg = weight_in_kg # Użycie przeliczonej wartości
+    product.unit = unit
+    
+    db.session.commit()
+    flash(f"Zaktualizowano produkt '{product.name}'.", 'success')
+    return redirect(url_for('production.manage_catalogue'))
+
 @bp.route('/catalogue/check_code')
 @login_required
 @permission_required('production')
