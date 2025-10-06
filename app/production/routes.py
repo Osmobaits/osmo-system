@@ -22,31 +22,41 @@ def manage_products():
 @permission_required('production')
 def manage_catalogue():
     if request.method == 'POST':
+        # --- LOGIKA ZAPISU ---
         name = request.form.get('name')
         product_code = request.form.get('product_code')
         category_id = request.form.get('category_id')
         packaging_weight = request.form.get('packaging_weight', type=float)
         unit = request.form.get('unit')
 
-        # --- NOWA LOGIKA KONWERSJI ---
         weight_in_kg = packaging_weight
         if unit.lower() in ['g', 'ml']:
             weight_in_kg = packaging_weight / 1000.0
-        # ----------------------------
 
         new_product = FinishedProduct(
             name=name,
             product_code=product_code,
             category_id=int(category_id),
-            packaging_weight_kg=weight_in_kg, # Użycie przeliczonej wartości
-            unit=unit
+            packaging_weight_kg=weight_in_kg, # Zapisz wagę w KG
+            unit=unit  # Zapisz oryginalną jednostkę wybraną przez użytkownika
         )
         db.session.add(new_product)
         db.session.commit()
         flash('Dodano nowy produkt do katalogu.', 'success')
         return redirect(url_for('production.manage_catalogue'))
 
+    # --- LOGIKA WYŚWIETLANIA ---
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
+    
+    # Przygotuj dane do wyświetlenia w formularzu
+    for category in categories:
+        for product in category.finished_products:
+            # Domyślnie użyj wagi w kg
+            product.display_weight = product.packaging_weight_kg
+            # Jeśli jednostką są gramy/ml, przelicz z powrotem do wyświetlenia
+            if product.unit and product.unit.lower() in ['g', 'ml']:
+                product.display_weight = product.packaging_weight_kg * 1000
+    
     return render_template('manage_catalogue.html', categories=categories)
 
 @bp.route('/catalogue/edit/<int:id>', methods=['POST'])
@@ -61,14 +71,12 @@ def edit_catalogue_product(id):
     packaging_weight = request.form.get('packaging_weight', type=float)
     unit = request.form.get('unit')
 
-    # --- NOWA LOGIKA KONWERSJI ---
     weight_in_kg = packaging_weight
     if unit.lower() in ['g', 'ml']:
         weight_in_kg = packaging_weight / 1000.0
-    # ----------------------------
     
-    product.packaging_weight_kg = weight_in_kg # Użycie przeliczonej wartości
-    product.unit = unit
+    product.packaging_weight_kg = weight_in_kg # Zapisz wagę w KG
+    product.unit = unit  # Zapisz oryginalną jednostkę wybraną przez użytkownika
     
     db.session.commit()
     flash(f"Zaktualizowano produkt '{product.name}'.", 'success')
