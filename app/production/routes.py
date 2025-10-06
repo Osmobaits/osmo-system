@@ -173,39 +173,37 @@ def manage_production_orders():
 
         product = FinishedProduct.query.get_or_404(product_id)
         
+        # --- NOWE ZABEZPIECZENIE: SPRAWDZENIE CZY RECEPTURA ISTNIEJE ---
+        if not product.recipe_components.first():
+            flash(f"BŁĄD: Nie można utworzyć zlecenia. Produkt '{product.name}' nie ma zdefiniowanej receptury.", 'danger')
+            return redirect(url_for('production.manage_production_orders'))
+        # -------------------------------------------------------------
+
         missing_components = []
         missing_packaging = []
 
-        # --- FUNKCJA POMOCNICZA DO KONWERSJI JEDNOSTEK ---
         def convert_unit(quantity, from_unit, to_unit):
             from_unit = from_unit.lower()
             to_unit = to_unit.lower()
-
-            # Najpierw przelicz wszystko na gramy
             grams = 0
             if from_unit == 'kg':
                 grams = quantity * 1000
             elif from_unit in ['g', 'ml']:
                 grams = quantity
             
-            # Teraz przelicz z gramów na jednostkę docelową
             if to_unit == 'kg':
                 return grams / 1000
             elif to_unit in ['g', 'ml']:
                 return grams
             
-            return quantity # Zwróć oryginał, jeśli jednostki nie są wagowe (np. szt.)
+            return quantity
 
-        # === KROK 1: WERYFIKACJA SUROWCÓW ===
         total_recipe_weight_g = 0
         for component in product.recipe_components:
-            # Obliczanie wagi receptury w gramach
             total_recipe_weight_g += convert_unit(component.quantity_required, component.unit, 'g')
-            
             required_quantity_orig_unit = component.quantity_required * batch_size
 
             if component.raw_material:
-                # Oblicz łączny stan magazynowy surowca w JEDNOSTCE RECEPTURY
                 total_stock_in_component_unit = 0
                 for batch in component.raw_material.batches:
                     total_stock_in_component_unit += convert_unit(batch.quantity_on_hand, batch.unit, component.unit)
@@ -218,7 +216,6 @@ def manage_production_orders():
                 if component.sub_product.quantity_in_stock < required_quantity_orig_unit:
                     missing_components.append(f"{component.sub_product.name} (brakuje: {int(required_quantity_orig_unit - component.sub_product.quantity_in_stock)} szt.)")
         
-        # === OBLICZANIE PLANOWANEJ ILOŚCI (NA GRAMACH) ===
         planned_quantity = 0
         packaging_weight_g = product.packaging_weight_kg * 1000
         if packaging_weight_g > 0:
@@ -227,13 +224,11 @@ def manage_production_orders():
         else:
             planned_quantity = batch_size
         
-        # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
             if item.packaging.quantity_in_stock < required_packaging:
                 missing_packaging.append(f"{item.packaging.name} (brakuje: {required_packaging - item.packaging.quantity_in_stock})")
 
-        # === KROK 3: OBSŁUGA BRAKÓW ===
         if missing_components or missing_packaging:
             error_message = "Brak wystarczających zasobów do rozpoczęcia produkcji. Brakuje:<br>"
             if missing_components:
@@ -243,7 +238,6 @@ def manage_production_orders():
             flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
-        # === KROK 4: ODEJMOWANIE ZASOBÓW ===
         new_order = ProductionOrder(
             finished_product_id=product.id,
             planned_quantity=planned_quantity,
@@ -266,10 +260,8 @@ def manage_production_orders():
                     
                     remaining_g = batch_g - take_g
                     
-                    # Przelicz z powrotem na oryginalną jednostkę partii
                     batch.quantity_on_hand = convert_unit(remaining_g, 'g', batch.unit)
                     
-                    # Zapisz w logu ile oryginalnych jednostek zużyto z tej partii
                     consumed_orig_unit = convert_unit(take_g, 'g', batch.unit)
                     log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=consumed_orig_unit)
                     db.session.add(log)
@@ -287,7 +279,6 @@ def manage_production_orders():
         flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
-    # Kod dla metody GET (wyświetlanie strony)
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('production_orders.html', products=products, orders=orders)
