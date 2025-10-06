@@ -176,43 +176,42 @@ def manage_production_orders():
         missing_components = []
         missing_packaging = []
 
-        # --- FUNKCJA POMOCNICZA DO KONWERSJI JEDNOSTEK ---
         def convert_to_kg(quantity, unit):
             unit = unit.lower()
             if unit == 'kg':
                 return quantity
-            elif unit in ['g', 'ml']: # Zakładamy, że 1ml ~ 1g
+            elif unit in ['g', 'ml']:
                 return quantity / 1000.0
-            return 0 # Ignorujemy jednostki, których nie da się przeliczyć na wagę, np. 'szt.'
+            return 0
 
-        # === KROK 1: WERYFIKACJA SUROWCÓW I PÓŁPRODUKTÓW ===
         total_recipe_weight_kg = 0.0
         for component in product.recipe_components:
-            # Obliczanie wagi receptury z uwzględnieniem jednostek
             component_weight_kg = convert_to_kg(component.quantity_required, component.unit)
             total_recipe_weight_kg += component_weight_kg
             
-            # Wymagana ilość w oryginalnej jednostce receptury
             required_quantity_orig_unit = component.quantity_required * batch_size
 
-            # Sprawdzenie surowców
             if component.raw_material:
-                # Oblicz łączny stan magazynowy surowca w KG
                 total_stock_kg = sum(convert_to_kg(batch.quantity_on_hand, batch.unit) for batch in component.raw_material.batches)
-                
-                # Przelicz wymaganą ilość na KG, aby móc je porównać
                 required_quantity_kg = convert_to_kg(required_quantity_orig_unit, component.unit)
 
                 if total_stock_kg < required_quantity_kg:
                     shortage_kg = required_quantity_kg - total_stock_kg
-                    missing_components.append(f"{component.raw_material.name} (brakuje: {shortage_kg:.3f} kg)")
-            
-            # Sprawdzenie półproduktów (zakładamy, że ich jednostka to 'szt.')
+                    
+                    # --- POPRAWIONA LOGIKA WYŚWIETLANIA BŁĘDU ---
+                    display_shortage = shortage_kg
+                    display_unit = 'kg'
+                    if component.unit.lower() in ['g', 'ml']:
+                        display_shortage = shortage_kg * 1000
+                        display_unit = component.unit
+                    
+                    missing_components.append(f"{component.raw_material.name} (brakuje: {display_shortage:.0f} {display_unit})")
+                    # ---------------------------------------------
+
             elif component.sub_product:
                 if component.sub_product.quantity_in_stock < required_quantity_orig_unit:
                     missing_components.append(f"{component.sub_product.name} (brakuje: {int(required_quantity_orig_unit - component.sub_product.quantity_in_stock)} szt.)")
         
-        # Obliczanie planowanej ilości
         planned_quantity = 0
         if product.packaging_weight_kg > 0:
             total_production_weight = total_recipe_weight_kg * batch_size
@@ -220,13 +219,11 @@ def manage_production_orders():
         else:
             planned_quantity = batch_size
         
-        # === KROK 2: WERYFIKACJA OPAKOWAŃ ===
         for item in product.packaging_bill:
             required_packaging = item.quantity_required * planned_quantity
             if item.packaging.quantity_in_stock < required_packaging:
                 missing_packaging.append(f"{item.packaging.name} (brakuje: {required_packaging - item.packaging.quantity_in_stock})")
 
-        # === KROK 3: OBSŁUGA BRAKÓW ===
         if missing_components or missing_packaging:
             error_message = "Brak wystarczających zasobów do rozpoczęcia produkcji. Brakuje:<br>"
             if missing_components:
@@ -236,7 +233,6 @@ def manage_production_orders():
             flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
-        # === KROK 4: WYSTARCZAJĄCE ZASOBY - ROZPOCZNIJ PRODUKCJĘ ===
         new_order = ProductionOrder(
             finished_product_id=product.id,
             planned_quantity=planned_quantity,
@@ -246,23 +242,19 @@ def manage_production_orders():
         db.session.add(new_order)
         db.session.flush()
 
-        # Odejmowanie zasobów z magazynu
         for component in product.recipe_components:
             required_quantity = component.quantity_required * batch_size
             
             if component.raw_material:
-                # Logika FIFO - pobieraj z najstarszych partii
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
-                temp_required = convert_to_kg(required_quantity, component.unit)
+                temp_required_kg = convert_to_kg(required_quantity, component.unit)
 
                 for batch in batches:
-                    if temp_required <= 0: break
+                    if temp_required_kg <= 0: break
                     
                     batch_qty_kg = convert_to_kg(batch.quantity_on_hand, batch.unit)
-                    take_qty_kg = min(batch_qty_kg, temp_required)
+                    take_qty_kg = min(batch_qty_kg, temp_required_kg)
                     
-                    # Oblicz, ile jednostek oryginalnych to stanowi
-                    # To jest skomplikowane jeśli jednostki są różne, upraszczamy do KG
                     original_units_to_take = (take_qty_kg / batch_qty_kg) * batch.quantity_on_hand if batch_qty_kg > 0 else 0
                     
                     batch.quantity_on_hand -= original_units_to_take
@@ -270,21 +262,19 @@ def manage_production_orders():
                     log = ProductionLog(production_order_id=new_order.id, raw_material_batch_id=batch.id, quantity_consumed=original_units_to_take)
                     db.session.add(log)
                     
-                    temp_required -= take_qty_kg
+                    temp_required_kg -= take_qty_kg
             
             elif component.sub_product:
                 component.sub_product.quantity_in_stock -= required_quantity
 
         db.session.commit()
 
-        # Logowanie aktywności
         log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'",
                      'production.production_order_details', order_id=new_order.id)
 
         flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
-    # Kod dla metody GET (wyświetlanie strony)
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('production_orders.html', products=products, orders=orders)
