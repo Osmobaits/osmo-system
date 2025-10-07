@@ -1,3 +1,46 @@
+<style>
+    /* Grupa 1: Produkty zaczynające się na "Wiggly Robin" */
+    a[data-name^="Wiggly"] {
+        --bs-btn-color: #0d6efd; /* Kolor tekstu (niebieski) */
+        --bs-btn-border-color: #0d6efd; /* Kolor ramki (niebieski) */
+    }
+    a[data-name^="Wiggly"]:hover {
+        --bs-btn-hover-bg: #0d6efd; /* Kolor tła po najechaniu */
+        --bs-btn-hover-border-color: #0d6efd;
+    }
+
+    /* Grupa 2: Produkty zaczynające się na "Larwa" */
+    a[data-name^="Larwa"] {
+        --bs-btn-color: #198754; /* Kolor tekstu (zielony) */
+        --bs-btn-border-color: #198754; /* Kolor ramki (zielony) */
+    }
+    a[data-name^="Larwa"]:hover {
+        --bs-btn-hover-bg: #198754;
+        --bs-btn-hover-border-color: #198754;
+    }
+	/* Grupa 3: Produkty zaczynające się na "Match" */
+    a[data-name^="Match"] {
+        --bs-btn-color: #ffc107; /* Kolor tekstu (czerwonyh) */
+        --bs-btn-border-color: #ffc107; /* Kolor ramki (czerwony) */
+    }
+    a[data-name^="Match"]:hover {
+        --bs-btn-hover-bg: #ffc107;
+        --bs-btn-hover-border-color: #ffc107;
+    }
+
+    /* DODAJ TUTAJ KOLEJNE GRUPY, np. dla "Krill" */
+    /*
+    a[data-name^="Krill"] {
+        --bs-btn-color: #dc3545; // Czerwony
+        --bs-btn-border-color: #dc3545;
+    }
+    a[data-name^="Krill"]:hover {
+        --bs-btn-hover-bg: #dc3545;
+        --bs-btn-hover-border-color: #dc3545;
+    }
+    */
+</style>
+
 {% extends "base.html" %}
 {% block title %}Katalog Produktów Gotowych{% endblock %}
 
