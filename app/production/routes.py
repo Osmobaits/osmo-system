@@ -77,17 +77,19 @@ def edit_catalogue_product(id):
     
     unit = request.form.get('unit')
 
-    # Przelicz na KG do zapisu w bazie, jeśli jednostka to g lub ml
     weight_in_kg = packaging_weight
     if unit.lower() in ['g', 'ml']:
         weight_in_kg = packaging_weight / 1000.0
     
-    product.packaging_weight_kg = weight_in_kg # Zawsze zapisuj wagę w KG
-    product.unit = unit  # Zapisz oryginalną jednostkę wybraną przez użytkownika
+    product.packaging_weight_kg = weight_in_kg
+    product.unit = unit
     
     db.session.commit()
     flash(f"Zaktualizowano produkt '{product.name}'.", 'success')
-    return redirect(url_for('production.manage_catalogue'))
+    
+    # --- ZMIANA TUTAJ ---
+    # Dodajemy parametr _anchor, który tworzy URL z #product-ID
+    return redirect(url_for('production.manage_catalogue', _anchor=f'product-{id}'))
 
 @bp.route('/catalogue/check_code')
 @login_required
