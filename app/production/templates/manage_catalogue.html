@@ -69,12 +69,12 @@
                         <h4>{{ category.name }}</h4>
                     </div>
                     <div class="card-body">
-                        <div class="border-bottom pb-2 mb-3" id="menu-{{ category.id }}">
-                            <strong>Przejdź do produktu w tej kategorii:</strong>
+                        <div class="border-bottom pb-2 mb-3 d-flex flex-wrap align-items-center" id="menu-{{ category.id }}">
+                            <strong>Przejdź do produktu:</strong>
                             {% for product in category.finished_products|sort(attribute='name') %}
                                 <a href="#product-{{ product.id }}" class="btn btn-sm btn-outline-dark m-1">{{ product.name }}</a>
                             {% endfor %}
-                            <a href="#top" class="btn btn-sm btn-outline-secondary m-1 float-end">Na górę ↑</a>
+                            <a href="#top" class="btn btn-sm btn-outline-secondary m-1 ms-auto">Na górę ↑</a>
                         </div>
 
                         {% for product in category.finished_products|sort(attribute='name') %}
