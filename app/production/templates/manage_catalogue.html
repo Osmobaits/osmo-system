@@ -69,13 +69,14 @@
                         <h4>{{ category.name }}</h4>
                     </div>
                     <div class="card-body">
-                        <div class="border-bottom pb-2 mb-3">
+                        <div class="border-bottom pb-2 mb-3" id="menu-{{ category.id }}">
                             <strong>Przejdź do produktu w tej kategorii:</strong>
-                            {% for product in category.finished_products %}
+                            {% for product in category.finished_products|sort(attribute='name') %}
                                 <a href="#product-{{ product.id }}" class="btn btn-sm btn-outline-dark m-1">{{ product.name }}</a>
                             {% endfor %}
                         </div>
-                        {% for product in category.finished_products %}
+
+                        {% for product in category.finished_products|sort(attribute='name') %}
                         <div class="card mb-2" id="product-{{ product.id }}">
                              <div class="card-body">
                                 <form id="edit-form-{{ product.id }}" method="POST" action="{{ url_for('production.edit_catalogue_product', id=product.id) }}">
@@ -109,7 +110,8 @@
                                             <span class="badge bg-dark ms-1">Przypisane opakowania: {{ product.packaging_bill.count() }}</span>
                                         </div>
                                         <div class="text-end">
-                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm">Receptura</a>
+                                            <a href="#menu-{{ category.id }}" class="btn btn-outline-secondary btn-sm">Do listy</a>
+                                            <a href="{{ url_for('production.manage_recipe', id=product.id) }}" class="btn btn-info btn-sm ms-2">Receptura</a>
                                             <a href="{{ url_for('production.manage_packaging_bill', product_id=product.id) }}" class="btn btn-secondary btn-sm ms-2">Opakowania</a>
                                             <button type="submit" form="edit-form-{{ product.id }}" class="btn btn-success btn-sm ms-2">Zapisz</button>
                                             <form method="POST" action="{{ url_for('production.delete_product', id=product.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno? Spowoduje to usunięcie również całej historii produkcji dla tego produktu!');">
@@ -122,7 +124,7 @@
                         </div>
                         {% endfor %}
                          <div class="text-end mt-2">
-                            <a href="#top" class="text-muted text-decoration-none">Powrót na górę ↑</a>
+                            <a href="#top" class="btn btn-sm btn-outline-primary">Powrót na górę ↑</a>
                         </div>
                     </div>
                 </div>
