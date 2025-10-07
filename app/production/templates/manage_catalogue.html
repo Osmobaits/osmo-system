@@ -1,5 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Katalog Produktów Gotowych{% endblock %}
+
+{% block content %}
 <style>
-    /* Grupa 1: Produkty zaczynające się na "Wiggly Robin" */
+    /* Grupa 1: Produkty zaczynające się na "Wiggly" */
     a[data-name^="Wiggly"] {
         --bs-btn-color: #0d6efd; /* Kolor tekstu (niebieski) */
         --bs-btn-border-color: #0d6efd; /* Kolor ramki (niebieski) */
@@ -18,33 +22,19 @@
         --bs-btn-hover-bg: #198754;
         --bs-btn-hover-border-color: #198754;
     }
-	/* Grupa 3: Produkty zaczynające się na "Match" */
+
+    /* Grupa 3: Produkty zaczynające się na "Match" */
     a[data-name^="Match"] {
-        --bs-btn-color: #ffc107; /* Kolor tekstu (czerwonyh) */
-        --bs-btn-border-color: #ffc107; /* Kolor ramki (czerwony) */
+        --bs-btn-color: #ffc107; /* Kolor tekstu (żółty) */
+        --bs-btn-border-color: #ffc107;
     }
     a[data-name^="Match"]:hover {
+        color: #000;
         --bs-btn-hover-bg: #ffc107;
         --bs-btn-hover-border-color: #ffc107;
     }
-
-    /* DODAJ TUTAJ KOLEJNE GRUPY, np. dla "Krill" */
-    /*
-    a[data-name^="Krill"] {
-        --bs-btn-color: #dc3545; // Czerwony
-        --bs-btn-border-color: #dc3545;
-    }
-    a[data-name^="Krill"]:hover {
-        --bs-btn-hover-bg: #dc3545;
-        --bs-btn-hover-border-color: #dc3545;
-    }
-    */
 </style>
 
-{% extends "base.html" %}
-{% block title %}Katalog Produktów Gotowych{% endblock %}
-
-{% block content %}
     <div id="top" class="d-flex justify-content-between align-items-center mb-4">
         <h1>Katalog Produktów Gotowych</h1>
         <a href="{{ url_for('production.manage_products') }}" class="btn btn-secondary">Powrót do Historii Produkcji</a>
@@ -115,7 +105,7 @@
                         <div class="border-bottom pb-2 mb-3 d-flex flex-wrap align-items-center" id="menu-{{ category.id }}">
                             <strong>Przejdź do produktu:</strong>
                             {% for product in category.finished_products|sort(attribute='name') %}
-                                <a href="#product-{{ product.id }}" class="btn btn-sm btn-outline-dark m-1">{{ product.name }}</a>
+                                <a href="#product-{{ product.id }}" class="btn btn-sm btn-outline-dark m-1" data-name="{{ product.name }}">{{ product.name }}</a>
                             {% endfor %}
                             <a href="#top" class="btn btn-sm btn-outline-secondary m-1 ms-auto">Na górę ↑</a>
                         </div>
