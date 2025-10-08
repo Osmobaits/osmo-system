@@ -30,6 +30,13 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=True)
     roles = db.relationship('Role', secondary=user_roles, lazy='subquery',
                             backref=db.backref('users', lazy=True))
+    
+    # Pola adresowe dla członków drużyny
+    address_street = db.Column(db.String(200), nullable=True)
+    address_postal_code = db.Column(db.String(10), nullable=True)
+    address_city = db.Column(db.String(100), nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
+
     assigned_tasks = db.relationship('Task', secondary=task_assignees, lazy='subquery',
                                      backref=db.backref('assignees', lazy=True))
 
@@ -217,16 +224,32 @@ class SalesReportLog(db.Model):
     report_date = db.Column(db.Date, nullable=False)
     quantity_sold = db.Column(db.Integer, nullable=False)
     product = db.relationship('FinishedProduct')
-    
+
 class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     action = db.Column(db.Text, nullable=False)
-    url = db.Column(db.String(255), nullable=True)  # Opcjonalny link do obiektu
-
+    url = db.Column(db.String(255), nullable=True)
     user = db.relationship('User', backref='activity_logs')
 
-    def __repr__(self):
-        return f'<ActivityLog {self.user.username}: {self.action[:50]}>'
+# === NOWE MODELE DLA TEAM MEMBER ===
+class TeamOrder(db.Model):
+    __tablename__ = 'team_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    order_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    status = db.Column(db.String(50), nullable=False, default='Oczekuje')
+    notes = db.Column(db.Text, nullable=True)
+    admin_notes = db.Column(db.Text, nullable=True)
+    user = db.relationship('User', backref='team_orders')
+    products = db.relationship('TeamOrderProduct', backref='order', cascade="all, delete-orphan")
+
+class TeamOrderProduct(db.Model):
+    __tablename__ = 'team_order_products'
+    id = db.Column(db.Integer, primary_key=True)
+    team_order_id = db.Column(db.Integer, db.ForeignKey('team_orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('finished_products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    product = db.relationship('FinishedProduct')

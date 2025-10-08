@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Mój Profil{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Mój Profil - Adres do wysyłki</h3></div>
+            <div class="card-body">
+                <p>Wprowadź i zaktualizuj swój adres, na który będziemy wysyłać produkty.</p>
+                <hr>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="address_street" class="form-label">Ulica i numer</label>
+                        <input type="text" class="form-control" id="address_street" name="address_street" value="{{ current_user.address_street or '' }}">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="address_postal_code" class="form-label">Kod pocztowy</label>
+                            <input type="text" class="form-control" id="address_postal_code" name="address_postal_code" value="{{ current_user.address_postal_code or '' }}">
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label for="address_city" class="form-label">Miejscowość</label>
+                            <input type="text" class="form-control" id="address_city" name="address_city" value="{{ current_user.address_city or '' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone_number" class="form-label">Numer telefonu (dla kuriera)</label>
+                        <input type="text" class="form-control" id="phone_number" name="phone_number" value="{{ current_user.phone_number or '' }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                    <a href="{{ url_for('team_member.dashboard') }}" class="btn btn-secondary">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

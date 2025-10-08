@@ -39,9 +39,28 @@ def manage_users():
 @permission_required('admin')
 def assign_roles(user_id):
     user = User.query.get_or_404(user_id)
-    assigned_role_ids = [int(role_id) for role_id in request.form.getlist('roles')]
-    user.roles = Role.query.filter(Role.id.in_(assigned_role_ids)).all()
+    
+    # Pobierz ID ról wysłanych z formularza
+    submitted_role_ids = {int(id) for id in request.form.getlist('roles')}
+    
+    all_roles = Role.query.all()
+    new_roles = []
+
+    # Zbuduj nową listę ról na podstawie tego, co zaznaczono
+    for role in all_roles:
+        if role.id in submitted_role_ids:
+            new_roles.append(role)
+    
+    # WARUNEK BEZPIECZEŃSTWA: Jeśli edytujemy użytkownika 'admin',
+    # upewnij się, że rola 'admin' ZAWSZE jest na jego liście.
+    if user.username == 'admin':
+        admin_role = Role.query.filter_by(name='admin').first()
+        if admin_role and admin_role not in new_roles:
+            new_roles.append(admin_role)
+
+    user.roles = new_roles
     db.session.commit()
+    
     flash(f"Zaktualizowano role dla użytkownika {user.username}.", "success")
     return redirect(url_for('admin.manage_users'))
 

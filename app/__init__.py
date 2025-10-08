@@ -71,14 +71,14 @@ def create_app():
         app.register_blueprint(packaging_routes.bp)
         from .reports import routes as reports_routes
         app.register_blueprint(reports_routes.bp)
+        from .team_member import routes as team_member_routes
+        app.register_blueprint(team_member_routes.bp)
         
     @app.cli.command("init-db")
     def init_db_command():
         """Tworzy tabele, role i pierwszego admina."""
         db.create_all()
-        # === POCZĄTEK ZMIANY: DODANIE ROLI 'vacations' ===
-        role_names = ['admin', 'warehouse', 'production', 'orders', 'tasks', 'vacations']
-        # === KONIEC ZMIANY ===
+        role_names = ['admin', 'warehouse', 'production', 'orders', 'tasks', 'vacations', 'team_member', 'team_orders']
         for name in role_names:
             if not Role.query.filter_by(name=name).first():
                 db.session.add(Role(name=name))
@@ -92,11 +92,47 @@ def create_app():
         db.session.commit()
         print("Baza danych zainicjalizowana z rolami i użytkownikiem admin.")
 
+    @app.cli.command("reset-admin-password")
+    @click.argument("new_password")
+    def reset_admin_password(new_password):
+        """Resetuje hasło dla użytkownika 'admin'."""
+        admin_user = User.query.filter_by(username='admin').first()
+        if admin_user:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            admin_user.password_hash = hashed_password
+            db.session.commit()
+            print("Hasło dla użytkownika 'admin' zostało pomyślnie zresetowane.")
+        else:
+            print("BŁĄD: Nie znaleziono użytkownika 'admin'.")
+
+    @app.cli.command("assign-role")
+    @click.argument("username")
+    @click.argument("role_name")
+    def assign_role(username, role_name):
+        """Przypisuje rolę do użytkownika."""
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            print(f"BŁĄD: Nie znaleziono użytkownika '{username}'.")
+            return
+            
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            print(f"BŁĄD: Nie znaleziono roli '{role_name}'.")
+            return
+
+        if role in user.roles:
+            print(f"Użytkownik '{username}' już ma rolę '{role_name}'.")
+        else:
+            user.roles.append(role)
+            db.session.commit()
+            print(f"Pomyślnie dodano rolę '{role_name}' do użytkownika '{username}'.")
+
     @app.context_processor
     def inject_new_tasks_count():
         if current_user.is_authenticated:
-            count = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').count()
-            return dict(new_tasks_count=count)
+            if not current_user.has_role('team_member'):
+                count = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').count()
+                return dict(new_tasks_count=count)
         return dict(new_tasks_count=0)
 
     return app

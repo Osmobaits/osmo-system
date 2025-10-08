@@ -15,41 +15,48 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% if current_user.is_authenticated %}
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('warehouse.index') }}">Magazyn Surowców</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('finished_goods.index') }}">Magazyn Produktów</a>
-                    </li>
-					 <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('packaging.index') }}">Magazyn Opakowań</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('production.manage_products') }}">Produkcja</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('orders.manage_clients') }}">Zamówienia</a>
-                    </li>
-                    <li class="nav-item">
-                        {# === POCZĄTEK ZMIANY: DODANIE LICZNIKA ZADAŃ === #}
-                        <a class="nav-link" href="{{ url_for('tasks.index') }}">
-                            Zadania
-                            {% if new_tasks_count > 0 %}
-                                <span class="badge bg-danger ms-1">{{ new_tasks_count }}</span>
-                            {% endif %}
-                        </a>
-                        {# === KONIEC ZMIANY === #}
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('vacations.index') }}">Urlopy</a>
-                    </li>
-                    {% if current_user.has_role('admin') %}
+                    
+                    {% if current_user.has_role('admin') or not current_user.has_role('team_member') %}
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('warehouse.index') }}">Magazyn Surowców</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('finished_goods.index') }}">Magazyn Produktów</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('packaging.index') }}">Magazyn Opakowań</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('production.manage_products') }}">Produkcja</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('orders.manage_clients') }}">Zamówienia</a></li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin.manage_users') }}">Admin</a>
+                            <a class="nav-link" href="{{ url_for('tasks.index') }}">Zadania
+                                {% if new_tasks_count > 0 %}<span class="badge bg-danger ms-1">{{ new_tasks_count }}</span>{% endif %}
+                            </a>
                         </li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('vacations.index') }}">Urlopy</a></li>
+                        {% if current_user.has_role('admin') %}
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.manage_users') }}">Admin</a></li>
+
+                            {% if current_user.has_role('team_member') %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="teamPortalDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Portal Drużyny
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="teamPortalDropdown">
+                                    <li><a class="dropdown-item" href="{{ url_for('team_member.dashboard') }}">Panel Drużyny</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('team_member.new_order') }}">Nowe Zamówienie (jako Team)</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('team_member.order_history') }}">Historia Zamówień (jako Team)</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('team_member.my_profile') }}">Mój Profil (jako Team)</a></li>
+                                </ul>
+                            </li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                    {% elif current_user.has_role('team_member') %}
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('team_member.dashboard') }}">Panel Drużyny</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('tasks.index') }}">Zadania</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('team_member.new_order') }}">Nowe Zamówienie</a></li>
+                         <li class="nav-item"><a class="nav-link" href="{{ url_for('team_member.order_history') }}">Historia Zamówień</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('team_member.my_profile') }}">Mój Profil</a></li>
+                    </ul>
                     {% endif %}
-                </ul>
                 {% endif %}
                 
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
@@ -71,10 +78,20 @@
     </nav>
 
     <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </main>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    </body>
+</body>
 </html>
