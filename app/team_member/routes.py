@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, Task, TeamOrder, TeamOrderProduct, FinishedProduct
+# Zaktualizuj tę linię, aby zawierała brakujące importy
+from app.models import db, Task, TeamOrder, TeamOrderProduct, FinishedProduct, FinishedProductCategory 
 from flask_login import login_required, current_user
 from app.decorators import permission_required
 from app.utils import log_activity
@@ -11,10 +12,9 @@ bp = Blueprint('team_member', __name__, template_folder='templates', url_prefix=
 def team_member_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Tymczasowo wyłączamy to zabezpieczenie, aby admin mógł wejść
-        # if not current_user.has_role('team_member'):
-        #     flash('Brak uprawnień do dostępu do tej strony.', 'danger')
-        #     return redirect(url_for('main.dashboard'))
+        if not (current_user.has_role('team_member') or current_user.has_role('admin')):
+            flash('Brak uprawnień do dostępu do tej strony.', 'danger')
+            return redirect(url_for('main.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -25,14 +25,9 @@ def dashboard():
     my_tasks = Task.query.filter(Task.assignees.contains(current_user), Task.status != 'Zakończone').order_by(Task.creation_date.desc()).all()
     my_orders = TeamOrder.query.filter_by(user_id=current_user.id).order_by(desc(TeamOrder.order_date)).limit(5).all()
     
-    # --- ZMIENNA DIAGNOSTYCZNA ---
-    all_user_roles = [role.name for role in current_user.roles]
-    # ------------------------------------
-
     return render_template('team_dashboard.html', 
                            tasks=my_tasks, 
-                           orders=my_orders,
-                           all_user_roles=all_user_roles) # Przekazujemy role do widoku
+                           orders=my_orders)
 
 @bp.route('/my_profile', methods=['GET', 'POST'])
 @login_required
@@ -55,14 +50,17 @@ def my_profile():
 @login_required
 @team_member_required
 def new_order():
+    team_categories = FinishedProductCategory.query.filter_by(available_for_team=True).order_by(FinishedProductCategory.name).all()
+    
     if request.method == 'POST':
         notes = request.form.get('notes')
-        
         new_team_order = TeamOrder(user_id=current_user.id, notes=notes)
         db.session.add(new_team_order)
         
         has_items = False
-        for product in FinishedProduct.query.all():
+        available_products = FinishedProduct.query.filter(FinishedProduct.category_id.in_([c.id for c in team_categories])).all()
+        
+        for product in available_products:
             quantity = request.form.get(f'product_{product.id}', type=int)
             if quantity and quantity > 0:
                 order_item = TeamOrderProduct(order=new_team_order, product_id=product.id, quantity=quantity)
@@ -78,8 +76,7 @@ def new_order():
         flash('Twoje zamówienie zostało złożone pomyślnie!', 'success')
         return redirect(url_for('team_member.dashboard'))
         
-    products = FinishedProduct.query.order_by(FinishedProduct.name).all()
-    return render_template('new_team_order.html', products=products)
+    return render_template('new_team_order.html', categories=team_categories)
 
 @bp.route('/order_history')
 @login_required

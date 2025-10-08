@@ -90,6 +90,7 @@ class FinishedProductCategory(db.Model):
     __tablename__ = 'finished_product_categories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    available_for_team = db.Column(db.Boolean, nullable=False, default=False)
     finished_products = db.relationship('FinishedProduct', backref='category', lazy=True)
 
 class PackagingCategory(db.Model):

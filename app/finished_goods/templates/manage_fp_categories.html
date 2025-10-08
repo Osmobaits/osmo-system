@@ -8,14 +8,7 @@
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
+      {% if messages %}{% for c, msg in messages %}<div class="alert alert-{{c}}">{{msg}}</div>{% endfor %}{% endif %}
     {% endwith %}
 
     <div class="row justify-content-center">
@@ -31,26 +24,39 @@
                     </form>
                 </div>
             </div>
-
             <div class="card shadow-sm">
                 <div class="card-header"><h3>Istniejące kategorie</h3></div>
-                <div class="card-body">
-                    <ul class="list-group">
-                        {% for category in categories %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <form method="POST" action="{{ url_for('finished_goods.edit_category', id=category.id) }}" class="d-flex flex-grow-1">
+                <ul class="list-group list-group-flush">
+                    {% for category in categories %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <form method="POST" action="{{ url_for('finished_goods.edit_category', id=category.id) }}" class="d-inline-flex">
                                 <input type="text" class="form-control" name="name" value="{{ category.name }}">
                                 <button type="submit" class="btn btn-success ms-2">Zapisz</button>
                             </form>
-                            <form method="POST" action="{{ url_for('finished_goods.delete_category', id=category.id) }}" onsubmit="return confirm('Czy na pewno chcesz usunąć tę kategorię?');" class="ms-2">
-                                <button type="submit" class="btn btn-danger">Usuń</button>
+                            {% if category.available_for_team %}
+                                <span class="badge bg-primary ms-2">Widoczna dla drużyny</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-2">Ukryta dla drużyny</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <form method="POST" action="{{ url_for('finished_goods.toggle_team_availability', category_id=category.id) }}" class="d-inline">
+                                {% if category.available_for_team %}
+                                    <button type="submit" class="btn btn-sm btn-warning">Ukryj</button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-sm btn-primary">Udostępnij</button>
+                                {% endif %}
                             </form>
-                        </li>
-                        {% else %}
-                        <li class="list-group-item text-center">Brak zdefiniowanych kategorii.</li>
-                        {% endfor %}
-                    </ul>
-                </div>
+                            <form method="POST" action="{{ url_for('finished_goods.delete_category', id=category.id) }}" onsubmit="return confirm('Czy na pewno chcesz usunąć?');" class="d-inline ms-1">
+                                <button type="submit" class="btn btn-sm btn-danger">Usuń</button>
+                            </form>
+                        </div>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center">Brak zdefiniowanych kategorii.</li>
+                    {% endfor %}
+                </ul>
             </div>
         </div>
     </div>

@@ -5,28 +5,34 @@
     <div class="card shadow-sm">
         <div class="card-body">
             <form method="POST">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Produkt</th>
-                            <th style="width: 150px;">Ilość (szt.)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for product in products %}
-                        <tr>
-                            <td><label for="product_{{ product.id }}">{{ product.name }}</label></td>
-                            <td><input type="number" class="form-control" name="product_{{ product.id }}" id="product_{{ product.id }}" min="0" value="0"></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                <div class="mb-3">
-                    <label for="notes" class="form-label">Dodatkowe uwagi do zamówienia (opcjonalnie)</label>
-                    <textarea name="notes" id="notes" class="form-control" rows="3"></textarea>
+                {% for category in categories %}
+                    <h4 class="mt-4 mb-3 border-bottom pb-2">{{ category.name }}</h4>
+                    <table class="table table-hover">
+                        <tbody>
+                            {% for product in category.finished_products|sort(attribute='name') %}
+                            <tr>
+                                <td><label for="product_{{ product.id }}">{{ product.name }}</label></td>
+                                <td style="width: 150px;">
+                                    <input type="number" class="form-control" name="product_{{ product.id }}" id="product_{{ product.id }}" min="0" value="0">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-center text-muted">Administrator nie udostępnił jeszcze żadnych produktów do zamawiania.</p>
+                {% endfor %}
+
+                {% if categories %}
+                <div class="mt-5">
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Dodatkowe uwagi do zamówienia (opcjonalnie)</label>
+                        <textarea name="notes" id="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Złóż zamówienie</button>
+                    <a href="{{ url_for('team_member.dashboard') }}" class="btn btn-secondary">Anuluj</a>
                 </div>
-                <button type="submit" class="btn btn-success">Złóż zamówienie</button>
-                <a href="{{ url_for('team_member.dashboard') }}" class="btn btn-secondary">Anuluj</a>
+                {% endif %}
             </form>
         </div>
     </div>
