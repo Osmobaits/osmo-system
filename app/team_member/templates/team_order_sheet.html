@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Zamówienie #{{ order.id }}</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: sans-serif; font-size: 10pt; }
+        h1 { text-align: center; margin-bottom: 1rem; }
+        .meta-info { text-align: center; color: #555; margin-bottom: 2rem; }
+        h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 2rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .shipping-details { border: 1px solid #ccc; padding: 15px; margin-top: 1rem; background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Zamówienie Drużynowe #{{ order.id }}</h1>
+    <div class="meta-info">
+        Złożone przez: {{ order.user.username }} | Data: {{ order.order_date|localdatetime }} | Wygenerowano: {{ generation_time|localdatetime }}
+    </div>
+
+    <h2>Dane do wysyłki</h2>
+    <div class="shipping-details">
+        <strong>{{ order.user.username }}</strong><br>
+        {{ order.user.address_street or 'Brak ulicy' }}<br>
+        {{ order.user.address_postal_code or 'Brak kodu' }} {{ order.user.address_city or 'Brak miejscowości' }}<br>
+        Tel: {{ order.user.phone_number or 'Brak numeru' }}
+    </div>
+
+    <h2>Zamówione produkty</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Produkt</th>
+                <th style="width: 20%;">Ilość (szt.)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.products %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if order.notes %}
+        <h2>Notatki do zamówienia</h2>
+        <p>{{ order.notes }}</p>
+    {% endif %}
+</body>
+</html>

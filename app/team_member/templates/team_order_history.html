@@ -7,10 +7,11 @@
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>ID Zamówienia</th>
+                        <th>ID</th>
                         <th>Data</th>
                         <th>Status</th>
                         <th>Produkty</th>
+                        <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -19,11 +20,7 @@
                         <td>#{{ order.id }}</td>
                         <td>{{ order.order_date|localdatetime }}</td>
                         <td>
-                            <span class="badge 
-                                {% if order.status == 'Oczekuje' %} bg-warning text-dark
-                                {% elif order.status == 'Zrealizowane' %} bg-success
-                                {% endif %}
-                            ">{{ order.status }}</span>
+                            <span class="badge {% if order.status == 'Oczekuje' %} bg-warning text-dark {% elif order.status == 'Zrealizowane' %} bg-success {% endif %}">{{ order.status }}</span>
                         </td>
                         <td>
                             <ul class="list-unstyled mb-0">
@@ -32,11 +29,14 @@
                                 {% endfor %}
                             </ul>
                         </td>
+                        <td class="text-end">
+                            {% if order.status == 'Oczekuje' %}
+                                <a href="{{ url_for('team_member.edit_my_order', order_id=order.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="4" class="text-center">Brak historii zamówień.</td>
-                    </tr>
+                    <tr><td colspan="5" class="text-center">Brak historii zamówień.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

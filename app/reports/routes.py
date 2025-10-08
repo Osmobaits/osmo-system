@@ -42,3 +42,28 @@ def inventory_sheet_pdf():
     return Response(pdf,
                     mimetype='application/pdf',
                     headers={'Content-Disposition': 'attachment;filename=inwentaryzacja.pdf'})
+                    
+from app.models import TeamOrder # Upewnij się, że ten import jest na górze pliku
+
+@bp.route('/team_order_pdf/<int:order_id>')
+@login_required
+@permission_required('admin')
+def team_order_pdf(order_id):
+    order = TeamOrder.query.options(
+        joinedload(TeamOrder.user),
+        joinedload(TeamOrder.products).joinedload(TeamOrderProduct.product)
+    ).get_or_404(order_id)
+
+    generation_time = datetime.now()
+
+    rendered_html = render_template('team_order_sheet.html', 
+                                    order=order, 
+                                    generation_time=generation_time)
+
+    pdf = HTML(string=rendered_html).write_pdf()
+
+    return Response(
+        pdf,
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment;filename=zamowienie_druzynowe_{order.id}.pdf'}
+    )

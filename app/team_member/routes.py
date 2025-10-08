@@ -84,3 +84,55 @@ def new_order():
 def order_history():
     my_orders = TeamOrder.query.filter_by(user_id=current_user.id).order_by(desc(TeamOrder.order_date)).all()
     return render_template('team_order_history.html', orders=my_orders)
+    
+@bp.route('/order/<int:order_id>', methods=['GET', 'POST'])
+@login_required
+@team_member_required
+def edit_my_order(order_id):
+    order = TeamOrder.query.get_or_404(order_id)
+
+    # Sprawdź, czy użytkownik jest właścicielem zamówienia i czy jest ono wciąż otwarte
+    if order.user_id != current_user.id:
+        flash('Nie masz uprawnień do edycji tego zamówienia.', 'danger')
+        return redirect(url_for('team_member.dashboard'))
+    if order.status != 'Oczekuje':
+        flash('Nie można edytować zamówienia, które zostało już zrealizowane.', 'warning')
+        return redirect(url_for('team_member.order_history'))
+
+    if request.method == 'POST':
+        order.notes = request.form.get('notes')
+        
+        # Stwórz słownik z istniejącymi produktami w zamówieniu dla łatwej aktualizacji
+        existing_products = {item.product_id: item for item in order.products}
+
+        team_categories = FinishedProductCategory.query.filter_by(available_for_team=True).all()
+        available_products = FinishedProduct.query.filter(FinishedProduct.category_id.in_([c.id for c in team_categories])).all()
+
+        for product in available_products:
+            quantity = request.form.get(f'product_{product.id}', type=int)
+            
+            # Sprawdź, czy produkt był już w zamówieniu
+            existing_item = existing_products.get(product.id)
+
+            if quantity and quantity > 0:
+                if existing_item:
+                    # Aktualizuj istniejący
+                    existing_item.quantity = quantity
+                else:
+                    # Dodaj nowy
+                    new_item = TeamOrderProduct(order=order, product_id=product.id, quantity=quantity)
+                    db.session.add(new_item)
+            elif existing_item:
+                # Jeśli ilość to 0, a produkt istniał - usuń go
+                db.session.delete(existing_item)
+        
+        db.session.commit()
+        log_activity(f"Zmodyfikował swoje zamówienie drużynowe #{order.id}")
+        flash('Zamówienie zostało zaktualizowane.', 'success')
+        return redirect(url_for('team_member.order_history'))
+
+    # Przygotuj słownik z ilościami dla formularza
+    order_quantities = {item.product_id: item.quantity for item in order.products}
+    team_categories = FinishedProductCategory.query.filter_by(available_for_team=True).order_by(FinishedProductCategory.name).all()
+    
+    return render_template('edit_team_order.html', order=order, categories=team_categories, quantities=order_quantities)
