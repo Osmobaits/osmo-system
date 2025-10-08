@@ -1,11 +1,12 @@
-# app/admin/routes.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct, ActivityLog
-from flask_login import login_required, current_user
+from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct, TeamOrder, TeamOrderProduct
+from flask_login import login_required, current_user, login_user
+from app import bcrypt
 from app.decorators import permission_required
-from app.auth.routes import bcrypt
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
+from app.utils import log_activity
 
 bp = Blueprint('admin', __name__, template_folder='templates', url_prefix='/admin')
 
@@ -17,22 +18,23 @@ def manage_users():
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
-        existing_user = User.query.filter_by(username=username).first()
-        existing_email = User.query.filter_by(email=email).first()
-        if existing_user:
-            flash('Użytkownik o tej nazwie już istnieje.', 'warning')
-        elif existing_email:
-            flash('Ten adres e-mail jest już używany.', 'warning')
+        
+        if User.query.filter_by(username=username).first():
+            flash('Użytkownik o tej nazwie już istnieje.', 'danger')
+        elif email and User.query.filter_by(email=email).first():
+            flash('Ten adres e-mail jest już używany.', 'danger')
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
             new_user = User(username=username, email=email, password_hash=hashed_password)
             db.session.add(new_user)
             db.session.commit()
-            flash(f"Utworzono użytkownika: {username}", "success")
+            flash(f'Utworzono nowego użytkownika: {username}', 'success')
         return redirect(url_for('admin.manage_users'))
+
     users = User.query.order_by(User.username).all()
     roles = Role.query.all()
     return render_template('manage_users.html', users=users, roles=roles)
+
 
 @bp.route('/assign_roles/<int:user_id>', methods=['POST'])
 @login_required
@@ -40,19 +42,14 @@ def manage_users():
 def assign_roles(user_id):
     user = User.query.get_or_404(user_id)
     
-    # Pobierz ID ról wysłanych z formularza
     submitted_role_ids = {int(id) for id in request.form.getlist('roles')}
-    
     all_roles = Role.query.all()
     new_roles = []
 
-    # Zbuduj nową listę ról na podstawie tego, co zaznaczono
     for role in all_roles:
         if role.id in submitted_role_ids:
             new_roles.append(role)
     
-    # WARUNEK BEZPIECZEŃSTWA: Jeśli edytujemy użytkownika 'admin',
-    # upewnij się, że rola 'admin' ZAWSZE jest na jego liście.
     if user.username == 'admin':
         admin_role = Role.query.filter_by(name='admin').first()
         if admin_role and admin_role not in new_roles:
@@ -61,29 +58,26 @@ def assign_roles(user_id):
     user.roles = new_roles
     db.session.commit()
     
+    if user.id == current_user.id:
+        login_user(user)
+    
     flash(f"Zaktualizowano role dla użytkownika {user.username}.", "success")
     return redirect(url_for('admin.manage_users'))
+
 
 @bp.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('admin')
 def edit_user(user_id):
-    user_to_edit = User.query.get_or_404(user_id)
+    user = User.query.get_or_404(user_id)
     if request.method == 'POST':
-        new_username = request.form.get('username')
-        new_email = request.form.get('email')
-        if new_username != user_to_edit.username and User.query.filter_by(username=new_username).first():
-            flash('Ta nazwa użytkownika jest już zajęta.', 'danger')
-            return redirect(url_for('admin.edit_user', user_id=user_id))
-        if new_email != user_to_edit.email and User.query.filter_by(email=new_email).first():
-            flash('Ten adres e-mail jest już używany.', 'danger')
-            return redirect(url_for('admin.edit_user', user_id=user_id))
-        user_to_edit.username = new_username
-        user_to_edit.email = new_email
+        user.username = request.form.get('username')
+        user.email = request.form.get('email')
         db.session.commit()
-        flash(f"Dane użytkownika {user_to_edit.username} zostały zaktualizowane.", "success")
+        flash('Dane użytkownika zostały zaktualizowane.', 'success')
         return redirect(url_for('admin.manage_users'))
-    return render_template('edit_user.html', user=user_to_edit)
+    return render_template('edit_user.html', user=user)
+
 
 @bp.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -93,16 +87,17 @@ def change_password(user_id):
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        if not new_password or new_password != confirm_password:
-            flash("Hasła muszą być takie same i nie mogą być puste.", "danger")
-            return redirect(url_for('admin.change_password', user_id=user_id))
-        user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
-        db.session.commit()
-        flash(f"Hasło dla użytkownika {user.username} zostało pomyślnie zmienione.", "success")
-        return redirect(url_for('admin.manage_users'))
+        if new_password != confirm_password:
+            flash('Hasła nie są identyczne.', 'danger')
+        else:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            user.password_hash = hashed_password
+            db.session.commit()
+            flash('Hasło zostało zmienione.', 'success')
+            return redirect(url_for('admin.manage_users'))
     return render_template('change_password.html', user=user)
 
-@bp.route('/all_tasks')
+@bp.route('/tasks')
 @login_required
 @permission_required('admin')
 def all_tasks():
@@ -113,55 +108,55 @@ def all_tasks():
 @login_required
 @permission_required('admin')
 def statistics():
-    # Sprawdzamy, jakiego dialektu bazy danych używamy
-    db_dialect = db.engine.dialect.name
-
-    if db_dialect == 'postgresql':
-        # Wersja dla PostgreSQL (produkcja)
+    engine_type = db.engine.dialect.name
+    if engine_type == 'postgresql':
         date_func_daily = func.to_char(ProductionOrder.order_date, 'YYYY-MM-DD')
         date_func_weekly = func.to_char(ProductionOrder.order_date, 'YYYY-WW')
         date_func_monthly = func.to_char(ProductionOrder.order_date, 'YYYY-MM')
     else:
-        # Wersja dla SQLite (lokalnie)
         date_func_daily = func.date(ProductionOrder.order_date)
         date_func_weekly = func.strftime('%Y-%W', ProductionOrder.order_date)
         date_func_monthly = func.strftime('%Y-%m', ProductionOrder.order_date)
 
-    # Statystyki dzienne
-    daily_stats = db.session.query(
-        date_func_daily.label('date'),
-        FinishedProduct.name.label('product_name'),
-        func.sum(ProductionOrder.quantity_produced).label('total_quantity')
-    ).join(FinishedProduct).group_by('date', 'product_name').order_by(db.desc('date')).all()
-
-    # Statystyki tygodniowe
-    weekly_stats = db.session.query(
-        date_func_weekly.label('week'),
-        FinishedProduct.name.label('product_name'),
-        func.sum(ProductionOrder.quantity_produced).label('total_quantity')
-    ).join(FinishedProduct).group_by('week', 'product_name').order_by(db.desc('week')).all()
+    daily_stats = db.session.query(date_func_daily.label('date'), FinishedProduct.name.label('product_name'), func.sum(ProductionOrder.quantity_produced).label('total_quantity')).join(FinishedProduct).group_by('date', 'product_name').order_by(db.desc('date')).all()
+    weekly_stats = db.session.query(date_func_weekly.label('week'), FinishedProduct.name.label('product_name'), func.sum(ProductionOrder.quantity_produced).label('total_quantity')).join(FinishedProduct).group_by('week', 'product_name').order_by(db.desc('week')).all()
+    monthly_stats = db.session.query(date_func_monthly.label('month'), FinishedProduct.name.label('product_name'), func.sum(ProductionOrder.quantity_produced).label('total_quantity')).join(FinishedProduct).group_by('month', 'product_name').order_by(db.desc('month')).all()
     
-    # Statystyki miesięczne
-    monthly_stats = db.session.query(
-        date_func_monthly.label('month'),
-        FinishedProduct.name.label('product_name'),
-        func.sum(ProductionOrder.quantity_produced).label('total_quantity')
-    ).join(FinishedProduct).group_by('month', 'product_name').order_by(db.desc('month')).all()
+    return render_template('statistics.html', daily_stats=daily_stats, weekly_stats=weekly_stats, monthly_stats=monthly_stats)
 
-    return render_template(
-        'statistics.html', 
-        daily_stats=daily_stats,
-        weekly_stats=weekly_stats,
-        monthly_stats=monthly_stats
-    )
-    
 @bp.route('/activity_log')
 @login_required
 @permission_required('admin')
 def activity_log():
     page = request.args.get('page', 1, type=int)
-    # Pobierz logi posortowane od najnowszych, z podziałem na strony
     logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).paginate(
         page=page, per_page=25
     )
     return render_template('activity_log.html', logs=logs)
+
+@bp.route('/team_orders')
+@login_required
+@permission_required('admin')
+def manage_team_orders():
+    """Wyświetla listę zamówień od członków drużyny."""
+    pending_orders = TeamOrder.query.filter_by(status='Oczekuje').order_by(TeamOrder.order_date.desc()).all()
+    completed_orders = TeamOrder.query.filter_by(status='Zrealizowane').order_by(TeamOrder.order_date.desc()).limit(20).all()
+    
+    return render_template('manage_team_orders.html', 
+                           pending_orders=pending_orders, 
+                           completed_orders=completed_orders)
+
+
+@bp.route('/team_orders/complete/<int:order_id>', methods=['POST'])
+@login_required
+@permission_required('admin')
+def complete_team_order(order_id):
+    """Oznacza zamówienie jako zrealizowane."""
+    order = TeamOrder.query.get_or_404(order_id)
+    order.status = 'Zrealizowane'
+    db.session.commit()
+    
+    log_activity(f"Oznaczył zamówienie drużynowe #{order.id} (dla {order.user.username}) jako zrealizowane.")
+    
+    flash(f"Zamówienie #{order.id} zostało oznaczone jako zrealizowane.", 'success')
+    return redirect(url_for('admin.manage_team_orders'))
