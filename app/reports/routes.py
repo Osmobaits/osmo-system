@@ -1,15 +1,16 @@
-# app/reports/routes.py
 from flask import Blueprint, render_template, Response
-from app.models import FinishedProductCategory, Category, PackagingCategory, RawMaterial
+from app.models import db, FinishedProductCategory, Category, PackagingCategory, RawMaterial, TeamOrder, TeamOrderProduct
 from flask_login import login_required
 from sqlalchemy.orm import joinedload
 from weasyprint import HTML
-from datetime import datetime # <-- NOWY IMPORT
+from datetime import datetime
+from app.decorators import permission_required # <-- DODAJ TEN IMPORT
 
 bp = Blueprint('reports', __name__, template_folder='templates', url_prefix='/reports')
 
 @bp.route('/inventory_sheet')
 @login_required
+@permission_required('admin') # Zakładając, że admin ma dostęp
 def inventory_sheet_pdf():
     # Pobieranie danych
     finished_product_categories = FinishedProductCategory.query.options(
@@ -24,26 +25,20 @@ def inventory_sheet_pdf():
         joinedload(PackagingCategory.packaging_items)
     ).order_by(PackagingCategory.name).all()
 
-    # === POCZĄTEK ZMIANY ===
-    # Pobieramy aktualny czas i przekazujemy go do szablonu jako obiekt
     generation_time = datetime.now()
-    # === KONIEC ZMIANY ===
 
-    # Renderowanie szablonu HTML
     rendered_html = render_template('inventory_sheet.html',
                                     finished_product_categories=finished_product_categories,
                                     raw_material_categories=raw_material_categories,
                                     packaging_categories=packaging_categories,
-                                    generation_time=generation_time) # <-- ZMIANA
+                                    generation_time=generation_time)
 
-    # Tworzenie PDF
     pdf = HTML(string=rendered_html).write_pdf()
 
     return Response(pdf,
                     mimetype='application/pdf',
                     headers={'Content-Disposition': 'attachment;filename=inwentaryzacja.pdf'})
-                    
-from app.models import TeamOrder # Upewnij się, że ten import jest na górze pliku
+
 
 @bp.route('/team_order_pdf/<int:order_id>')
 @login_required
@@ -53,15 +48,15 @@ def team_order_pdf(order_id):
         joinedload(TeamOrder.user),
         joinedload(TeamOrder.products).joinedload(TeamOrderProduct.product)
     ).get_or_404(order_id)
-
+    
     generation_time = datetime.now()
-
+    
     rendered_html = render_template('team_order_sheet.html', 
                                     order=order, 
                                     generation_time=generation_time)
-
+    
     pdf = HTML(string=rendered_html).write_pdf()
-
+    
     return Response(
         pdf,
         mimetype='application/pdf',
