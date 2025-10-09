@@ -151,12 +151,36 @@ def manage_team_orders():
 @login_required
 @permission_required('admin')
 def complete_team_order(order_id):
-    """Oznacza zamówienie jako zrealizowane."""
+    """Oznacza zamówienie jako zrealizowane i zdejmuje produkty ze stanu."""
     order = TeamOrder.query.get_or_404(order_id)
+
+    # 1. Sprawdź, czy zamówienie nie zostało już zrealizowane, aby uniknąć podwójnego zdjęcia ze stanu
+    if order.status == 'Zrealizowane':
+        flash(f"Zamówienie #{order.id} zostało już wcześniej zrealizowane.", 'warning')
+        return redirect(url_for('admin.manage_team_orders'))
+
+    # 2. Sprawdź, czy jest wystarczająca ilość produktów na stanie
+    missing_products = []
+    for item in order.products:
+        product = item.product
+        if product.quantity_in_stock < item.quantity:
+            missing_products.append(f"'{product.name}' (brakuje: {item.quantity - product.quantity_in_stock} szt.)")
+    
+    if missing_products:
+        error_message = "Nie można zrealizować zamówienia z powodu braków w magazynie: <ul>" + "".join(f"<li>{p}</li>" for p in missing_products) + "</ul>"
+        flash(Markup(error_message), 'danger')
+        return redirect(url_for('admin.manage_team_orders'))
+
+    # 3. Odejmij produkty ze stanu magazynowego
+    for item in order.products:
+        item.product.quantity_in_stock -= item.quantity
+    
+    # 4. Zmień status zamówienia
     order.status = 'Zrealizowane'
+    
     db.session.commit()
     
-    log_activity(f"Oznaczył zamówienie drużynowe #{order.id} (dla {order.user.username}) jako zrealizowane.")
+    log_activity(f"Zrealizował zamówienie drużynowe #{order.id} (dla {order.user.username}) i zdjął produkty ze stanu.")
     
-    flash(f"Zamówienie #{order.id} zostało oznaczone jako zrealizowane.", 'success')
+    flash(f"Zamówienie #{order.id} zostało zrealizowane, a stany magazynowe zaktualizowane.", 'success')
     return redirect(url_for('admin.manage_team_orders'))
