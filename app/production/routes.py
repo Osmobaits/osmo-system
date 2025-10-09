@@ -340,33 +340,44 @@ def edit_batch(order_id):
 @login_required
 @permission_required('production')
 def delete_batch(order_id):
-    order = ProductionOrder.query.get_or_404(order_id)
+    order_to_delete = ProductionOrder.query.get_or_404(order_id)
+
+    # 1. Zwróć surowce i półprodukty na stan magazynowy
+    logs = ProductionLog.query.filter_by(production_order_id=order_to_delete.id).all()
+    for log in logs:
+        # Zwracanie surowców
+        if log.batch:
+            log.batch.quantity_on_hand += log.quantity_consumed
+        
+        # --- POCZĄTEK POPRAWKI: Zwracanie półproduktów ---
+        # Sprawdzamy, czy log dotyczy zużycia z innego zlecenia (czyli półproduktu)
+        elif log.consumed_from_order:
+            # Pobieramy produkt gotowy z tego zużytego zlecenia
+            sub_product = log.consumed_from_order.finished_product
+            if sub_product:
+                # Zwracamy zużytą ilość na stan magazynowy półproduktu
+                sub_product.quantity_in_stock += log.quantity_consumed
+        # --- KONIEC POPRAWKI ---
+
+    # 2. Odejmij wyprodukowany produkt ze stanu (jeśli został dodany)
+    product = order_to_delete.finished_product
+    if product and order_to_delete.quantity_produced > 0:
+        product.quantity_in_stock -= order_to_delete.quantity_produced
+
+    # 3. Zwróć opakowania na stan (jeśli zostały pobrane)
+    if order_to_delete.quantity_produced > 0:
+        for item in product.packaging_bill:
+            packaging_item = item.packaging
+            packaging_item.quantity_in_stock += (item.quantity_required * order_to_delete.quantity_produced)
+
+    # 4. Usuń logi i samo zlecenie
+    for log in logs:
+        db.session.delete(log)
+    db.session.delete(order_to_delete)
     
-    try:
-        # TODO: Logika zwrotu materiałów musi zostać rozbudowana o półprodukty
-        for log in order.consumption_log:
-            if log.raw_material_batch_id:
-                batch = RawMaterialBatch.query.get(log.raw_material_batch_id)
-                if batch:
-                    batch.quantity_on_hand += log.quantity_consumed
-        
-        product = order.finished_product
-        product.quantity_in_stock -= order.quantity_produced
-        
-        if product.packaging_bill:
-            for item in product.packaging_bill:
-                if item.packaging:
-                    item.packaging.quantity_in_stock += (item.quantity_required * order.quantity_produced)
-        
-        ProductionLog.query.filter_by(production_order_id=order_id).delete()
-        db.session.delete(order)
-        db.session.commit()
-        
-        flash("Usunięto wpis z historii produkcji. Wszystkie zużyte materiały zostały zwrócone na stan.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Wystąpił błąd podczas usuwania zlecenia: {e}", "danger")
-        
+    db.session.commit()
+    
+    flash('Zlecenie produkcyjne zostało usunięte, a wszystkie zasoby (w tym półprodukty) zwrócone na stan magazynowy.', 'success')
     return redirect(url_for('production.manage_products'))
 
 @bp.route('/order/<int:order_id>')
