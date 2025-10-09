@@ -190,10 +190,6 @@ def manage_production_orders():
         product_id = request.form.get('product_id')
         batch_size = request.form.get('batch_size', type=int)
 
-        # --- POCZĄTEK KODU DIAGNOSTYCZNEGO ---
-        print("\n--- [DEBUG] Rozpoczynanie nowego zlecenia ---")
-        # --- KONIEC KODU DIAGNOSTYCZNEGO ---
-
         if not product_id or not batch_size or batch_size <= 0:
             flash('Proszę wybrać produkt i podać prawidłową liczbę porcji.', 'warning')
             return redirect(url_for('production.manage_production_orders'))
@@ -207,44 +203,38 @@ def manage_production_orders():
         missing_components = []
         missing_packaging = []
 
-        def convert_unit(quantity, from_unit, to_unit='g'): # Uproszczone, bo w tej funkcji zawsze przeliczamy na gramy
+        def convert_unit(quantity, from_unit, to_unit='g'):
             from_unit = from_unit.lower()
+            grams = 0
             if from_unit == 'kg':
-                return quantity * 1000
+                grams = quantity * 1000
             elif from_unit in ['g', 'ml']:
-                return quantity
-            return 0
+                grams = quantity
+            else: # Dla 'szt.' i innych
+                return quantity 
+
+            if to_unit.lower() == 'kg':
+                return grams / 1000
+            return grams
 
         total_recipe_weight_g = 0
-        print("--- [DEBUG] Obliczanie wagi receptury:")
         for component in product.recipe_components:
-            component_weight_g = convert_unit(component.quantity_required, component.unit)
-            component_name = "Nieznany"
-            if component.raw_material:
-                component_name = component.raw_material.name
-            elif component.sub_product:
-                component_name = component.sub_product.name
-            print(f"    - Składnik: '{component_name}' | Ilość: {component.quantity_required} {component.unit} -> Przeliczono na: {component_weight_g}g")
-            total_recipe_weight_g += component_weight_g
-        
-        print(f"--- [DEBUG] Całkowita waga receptury: {total_recipe_weight_g}g")
+            total_recipe_weight_g += convert_unit(component.quantity_required, component.unit)
         
         planned_quantity = 0
         packaging_weight_g = product.packaging_weight_kg * 1000
-        
-        print(f"--- [DEBUG] Waga opakowania: {packaging_weight_g}g | Mnożnik (batch_size): {batch_size}")
-
         if packaging_weight_g > 0:
             total_production_weight_g = total_recipe_weight_g * batch_size
-            print(f"--- [DEBUG] Całkowita waga produkcji: {total_production_weight_g}g")
             planned_quantity = int(total_production_weight_g / packaging_weight_g)
         else:
             planned_quantity = batch_size
-            
-        print(f"--- [DEBUG] Finalna planowana ilość: {planned_quantity} szt.")
-        print("-------------------------------------------\n")
-        
-        # Reszta funkcji bez zmian...
+
+        if planned_quantity <= 0:
+            flash(f"Nie można utworzyć zlecenia. Obliczona ilość opakowań wynosi zero. "
+                  f"Prawdopodobnie całkowita waga produkcji ({total_production_weight_g:.2f}g) jest mniejsza "
+                  f"niż waga jednego opakowania ({packaging_weight_g:.2f}g). Zwiększ liczbę porcji.", 'danger')
+            return redirect(url_for('production.manage_production_orders'))
+
         for component in product.recipe_components:
             required_quantity_orig_unit = component.quantity_required * batch_size
             if component.raw_material:
@@ -272,13 +262,19 @@ def manage_production_orders():
             flash(Markup(error_message), 'danger')
             return redirect(url_for('production.manage_production_orders'))
 
-        new_order = ProductionOrder(finished_product_id=product.id, planned_quantity=planned_quantity, quantity_produced=0, sample_required=False)
+        new_order = ProductionOrder(
+            finished_product_id=product.id,
+            planned_quantity=planned_quantity,
+            quantity_produced=0,
+            sample_required=False 
+        )
         db.session.add(new_order)
         db.session.flush()
 
         for component in product.recipe_components:
+            required_quantity = component.quantity_required * batch_size
             if component.raw_material:
-                required_g = convert_unit(component.quantity_required * batch_size, component.unit)
+                required_g = convert_unit(required_quantity, component.unit)
                 batches = sorted(component.raw_material.batches, key=lambda b: b.received_date)
                 for batch in batches:
                     if required_g <= 0: break
@@ -291,17 +287,23 @@ def manage_production_orders():
                     db.session.add(log)
                     required_g -= take_g
             elif component.sub_product:
-                component.sub_product.quantity_in_stock -= (component.quantity_required * batch_size)
+                component.sub_product.quantity_in_stock -= required_quantity
+                source_order_for_subproduct = ProductionOrder.query.filter_by(finished_product_id=component.sub_product_id).order_by(ProductionOrder.order_date.desc()).first()
+                log = ProductionLog(
+                    production_order_id=new_order.id,
+                    sub_product_order_id=source_order_for_subproduct.id if source_order_for_subproduct else None,
+                    quantity_consumed=required_quantity
+                )
+                db.session.add(log)
 
         db.session.commit()
-        log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'", 'production.production_order_details', order_id=new_order.id)
+        log_activity(f"Utworzył zlecenie produkcyjne #{new_order.id} dla produktu: '{product.name}'",'production.production_order_details', order_id=new_order.id)
         flash('Utworzono nowe zlecenie produkcyjne i pobrano zasoby z magazynu.', 'success')
         return redirect(url_for('production.manage_production_orders'))
 
     products = FinishedProduct.query.order_by(FinishedProduct.name).all()
     orders = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
     return render_template('production_orders.html', products=products, orders=orders)
-
 
 @bp.route('/batch/edit/<int:order_id>', methods=['GET', 'POST'])
 @login_required
