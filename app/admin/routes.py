@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct, TeamOrder, TeamOrderProduct
+from app.models import db, User, Role, Task, ProductionOrder, FinishedProduct, TeamOrder, TeamOrderProduct, ActivityLog
 from flask_login import login_required, current_user, login_user
 from app import bcrypt
 from app.decorators import permission_required
