@@ -49,6 +49,9 @@
                                 <form method="POST" action="{{ url_for('admin.complete_team_order', order_id=order.id) }}" class="d-inline ms-1">
                                     <button type="submit" class="btn btn-success">Oznacz jako zrealizowane</button>
                                 </form>
+                                <form method="POST" action="{{ url_for('admin.delete_team_order', order_id=order.id) }}" class="d-inline ms-1" onsubmit="return confirm('Czy na pewno chcesz TRWALE usunąć to zamówienie? Ta akcja jest nieodwracalna.');">
+                                    <button type="submit" class="btn btn-danger">Usuń</button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -72,6 +75,7 @@
                         <th>Członek Drużyny</th>
                         <th>Data zamówienia</th>
                         <th>Status</th>
+                        <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,9 +85,14 @@
                         <td>{{ order.user.username }}</td>
                         <td>{{ order.order_date|localdatetime }}</td>
                         <td><span class="badge bg-success">{{ order.status }}</span></td>
+                        <td class="text-end">
+                            <form method="POST" action="{{ url_for('admin.delete_team_order', order_id=order.id) }}" class="d-inline ms-1" onsubmit="return confirm('Czy na pewno chcesz TRWALE usunąć to zamówienie? Stany magazynowe NIE zostaną zwrócone. Ta akcja jest nieodwracalna.');">
+                                <button type="submit" class="btn btn-sm btn-danger">Usuń</button>
+                            </form>
+                        </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" class="text-center text-muted">Brak zrealizowanych zamówień.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted">Brak zrealizowanych zamówień.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

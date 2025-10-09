@@ -184,3 +184,20 @@ def complete_team_order(order_id):
     
     flash(f"Zamówienie #{order.id} zostało zrealizowane, a stany magazynowe zaktualizowane.", 'success')
     return redirect(url_for('admin.manage_team_orders'))
+    
+@bp.route('/team_orders/delete/<int:order_id>', methods=['POST'])
+@login_required
+@permission_required('admin')
+def delete_team_order(order_id):
+    """Trwale usuwa zamówienie drużynowe bez zwracania produktów na stan."""
+    order = TeamOrder.query.get_or_404(order_id)
+    
+    # Usuwamy obiekt zamówienia. Dzięki ustawieniu 'cascade' w modelu,
+    # powiązane z nim produkty (TeamOrderProduct) zostaną usunięte automatycznie.
+    db.session.delete(order)
+    db.session.commit()
+    
+    log_activity(f"Trwale usunął zamówienie drużynowe #{order.id} (użytkownik: {order.user.username}).")
+    
+    flash(f"Zamówienie #{order.id} zostało trwale usunięte.", 'success')
+    return redirect(url_for('admin.manage_team_orders'))
