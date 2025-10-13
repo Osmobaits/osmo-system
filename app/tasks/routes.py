@@ -192,3 +192,34 @@ def remind_task(id):
     else:
         flash("Nie masz uprawnień, aby wysłać przypomnienia.", "danger")
     return redirect(url_for('tasks.task_details', id=id))
+    
+@bp.route('/delete/<int:id>', methods=['POST'])
+@login_required
+@permission_required('admin') # Tylko admin może kasować zadania
+def delete_task(id):
+    """Trwale usuwa zadanie wraz z jego załącznikami."""
+    task_to_delete = Task.query.get_or_404(id)
+
+    # 1. Usuń fizyczne pliki załączników z serwera
+    for attachment in task_to_delete.attachments:
+        try:
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], attachment.filepath)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except Exception as e:
+            # Jeśli pliku nie ma, po prostu zignoruj błąd i kontynuuj
+            print(f"Błąd podczas usuwania pliku {attachment.filepath}: {e}")
+
+    # 2. Usuń zadanie z bazy danych
+    # (Załączniki zostaną usunięte automatycznie dzięki 'cascade="all, delete-orphan"')
+    db.session.delete(task_to_delete)
+    db.session.commit()
+
+    log_activity(f"Trwale usunął zadanie: '{task_to_delete.title}'")
+
+    flash(f"Zadanie '{task_to_delete.title}' zostało trwale usunięte.", 'success')
+
+    # Przekieruj na listę zadań lub do archiwum, w zależności skąd przyszliśmy
+    if 'archive' in request.referrer:
+        return redirect(url_for('tasks.archive'))
+    return redirect(url_for('tasks.index'))

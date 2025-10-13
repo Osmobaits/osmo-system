@@ -18,6 +18,11 @@
                 {% if (task.assigner_id == current_user.id or current_user.has_role('admin')) and task.status != 'Zakończone' %}
                 <a href="{{ url_for('tasks.edit_task', id=task.id) }}" class="btn btn-warning btn-sm">Edytuj Zadanie</a>
                 {% endif %}
+				{% if current_user.has_role('admin') %}
+    <form method="POST" action="{{ url_for('tasks.delete_task', id=task.id) }}" class="d-inline ms-1" onsubmit="return confirm('Czy na pewno chcesz TRWALE usunąć to zadanie? Ta akcja jest nieodwracalna.');">
+        <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
+    </form>
+    {% endif %}
                 <span class="badge 
                     {% if task.status == 'Nowe' %} bg-primary
                     {% elif task.status == 'Przyjęte' %} bg-info text-dark
