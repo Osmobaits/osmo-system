@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Edycja Admina: Wniosek Urlopowy{% endblock %}
-
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
@@ -18,6 +17,14 @@
                             <label for="end_date" class="form-label">Data zakończenia</label>
                             <input type="date" class="form-control" id="end_date" name="end_date" value="{{ req.end_date.strftime('%Y-%m-%d') }}" required>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Kategoria urlopu</label>
+                        <select id="category" name="category" class="form-select" required>
+                            <option value="Wypoczynkowy" {% if req.category == 'Wypoczynkowy' %}selected{% endif %}>Wypoczynkowy</option>
+                            <option value="Na żądanie" {% if req.category == 'Na żądanie' %}selected{% endif %}>Na żądanie</option>
+                            <option value="Okolicznościowy" {% if req.category == 'Okolicznościowy' %}selected{% endif %}>Okolicznościowy</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="status" class="form-label">Status wniosku</label>

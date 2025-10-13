@@ -214,6 +214,9 @@ class VacationRequest(db.Model):
     end_date = db.Column(db.Date, nullable=False)
     request_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     status = db.Column(db.String(50), nullable=False, default='Oczekuje')
+    # --- NOWA KOLUMNA ---
+    category = db.Column(db.String(50), nullable=False, default='Wypoczynkowy')
+    # --------------------
     notes = db.Column(db.Text, nullable=True)
     admin_notes = db.Column(db.Text, nullable=True)
     user = db.relationship('User', backref='vacation_requests')

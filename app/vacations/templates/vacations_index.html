@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Urlopy{% endblock %}
-
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Pulpit Urlopów</h1>
-        <a href="{{ url_for('vacations.create_request') }}" class="btn btn-primary">Złóż nowy wniosek urlopowy</a>
+        <div>
+            {% if current_user.has_role('admin') %}
+                <a href="{{ url_for('vacations.admin_create_request') }}" class="btn btn-info">Dodaj Urlop Pracownikowi</a>
+            {% endif %}
+            <a href="{{ url_for('vacations.create_request') }}" class="btn btn-primary">Złóż nowy wniosek</a>
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -12,7 +16,6 @@
     {% endwith %}
 
     {% if current_user.has_role('admin') %}
-        {# WIDOK DLA ADMINISTRATORA #}
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-warning"><h3>Wnioski oczekujące na akceptację ({{ pending_requests|length }})</h3></div>
             <div class="card-body">
@@ -22,6 +25,7 @@
                             <div class="col-md-6">
                                 <p><strong>Pracownik:</strong> {{ req.user.username }}</p>
                                 <p><strong>Okres urlopu:</strong> {{ req.start_date.strftime('%Y-%m-%d') }} do {{ req.end_date.strftime('%Y-%m-%d') }}</p>
+                                <p><strong>Kategoria:</strong> <span class="badge bg-secondary">{{ req.category }}</span></p>
                                 <p><strong>Notatki pracownika:</strong> {{ req.notes or 'Brak' }}</p>
                             </div>
                             <div class="col-md-6">
@@ -40,55 +44,47 @@
                 {% endfor %}
             </div>
         </div>
-
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-success text-white"><h3>Zatwierdzone urlopy</h3></div>
             <div class="card-body">
                 <table class="table table-sm table-striped table-hover">
-                    <thead><tr><th>Pracownik</th><th>Okres urlopu</th><th>Data złożenia</th><th>Uwagi</th><th>Akcje</th></tr></thead>
+                    <thead><tr><th>Pracownik</th><th>Okres urlopu</th><th>Kategoria</th><th>Data złożenia</th><th>Uwagi</th><th>Akcje</th></tr></thead>
                     <tbody>
                         {% for req in approved_requests %}
                         <tr>
                             <td>{{ req.user.username }}</td>
                             <td>{{ req.start_date.strftime('%Y-%m-%d') }} - {{ req.end_date.strftime('%Y-%m-%d') }}</td>
+                            <td><span class="badge bg-secondary">{{ req.category }}</span></td>
                             <td>{{ req.request_date | localdatetime }}</td>
                             <td>{{ req.admin_notes or 'Brak' }}</td>
-                            {# === POCZĄTEK ZMIANY: PRZYCISKI DLA ADMINA === #}
                             <td class="text-end">
                                 <a href="{{ url_for('vacations.admin_edit_request', request_id=req.id) }}" class="btn btn-info btn-sm">Edytuj</a>
                                 <form method="POST" action="{{ url_for('vacations.admin_delete_request', request_id=req.id) }}" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz trwale usunąć ten wniosek?');">
                                     <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
                                 </form>
                             </td>
-                            {# === KONIEC ZMIANY === #}
                         </tr>
                         {% else %}
-                        <tr><td colspan="5" class="text-center">Brak zatwierdzonych urlopów.</td></tr>
+                        <tr><td colspan="6" class="text-center">Brak zatwierdzonych urlopów.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
     {% else %}
-        {# WIDOK DLA ZWYKŁEGO UŻYTKOWNIKA #}
         <div class="card shadow-sm">
             <div class="card-header"><h3>Twoje wnioski urlopowe</h3></div>
             <div class="card-body">
                 <table class="table table-striped table-hover">
-                    <thead><tr><th>Data złożenia</th><th>Okres urlopu</th><th>Status</th><th>Uwagi Admina</th><th>Akcje</th></tr></thead>
+                    <thead><tr><th>Data złożenia</th><th>Okres urlopu</th><th>Kategoria</th><th>Status</th><th>Uwagi Admina</th><th>Akcje</th></tr></thead>
                     <tbody>
                         {% for req in my_requests %}
                         <tr>
                             <td>{{ req.request_date | localdatetime }}</td>
                             <td>{{ req.start_date.strftime('%Y-%m-%d') }} - {{ req.end_date.strftime('%Y-%m-%d') }}</td>
+                            <td><span class="badge bg-secondary">{{ req.category }}</span></td>
                             <td>
-                                <span class="badge 
-                                    {% if req.status == 'Oczekuje' %} bg-warning text-dark
-                                    {% elif req.status == 'Zatwierdzony' %} bg-success
-                                    {% elif req.status == 'Odrzucony' %} bg-danger
-                                    {% endif %}
-                                ">{{ req.status }}</span>
+                                <span class="badge {% if req.status == 'Oczekuje' %} bg-warning text-dark {% elif req.status == 'Zatwierdzony' %} bg-success {% elif req.status == 'Odrzucony' %} bg-danger {% endif %}">{{ req.status }}</span>
                             </td>
                             <td>{{ req.admin_notes or 'Brak' }}</td>
                             <td>
@@ -101,7 +97,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="5" class="text-center">Nie złożyłeś jeszcze żadnych wniosków urlopowych.</td></tr>
+                        <tr><td colspan="6" class="text-center">Nie złożyłeś jeszcze żadnych wniosków urlopowych.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Dodaj Urlop Pracownikowi{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Dodaj urlop dla pracownika (Admin)</h3></div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">Pracownik</label>
+                        <select id="user_id" name="user_id" class="form-select" required>
+                            <option value="">Wybierz...</option>
+                            {% for employee in employees %}
+                                {% if not employee.has_role('admin') %}
+                                <option value="{{ employee.id }}">{{ employee.username }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="start_date" class="form-label">Data rozpoczęcia</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="end_date" class="form-label">Data zakończenia</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Kategoria urlopu</label>
+                        <select id="category" name="category" class="form-select" required>
+                            <option value="Wypoczynkowy">Wypoczynkowy</option>
+                            <option value="Na żądanie">Na żądanie</option>
+                            <option value="Okolicznościowy">Okolicznościowy</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="admin_notes" class="form-label">Notatki administratora (opcjonalnie)</label>
+                        <textarea class="form-control" id="admin_notes" name="admin_notes" rows="3"></textarea>
+                    </div>
+                    <p class="small text-muted">Ten urlop zostanie automatycznie zatwierdzony.</p>
+                    <button type="submit" class="btn btn-primary">Dodaj urlop</button>
+                    <a href="{{ url_for('vacations.index') }}" class="btn btn-secondary">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
