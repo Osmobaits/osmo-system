@@ -1,8 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.models import db, FinishedProduct, FinishedProductCategory
+from app.models import db, FinishedProduct, FinishedProductCategory, SalesReportLog
 from flask_login import login_required
 from app.decorators import permission_required
 from sqlalchemy import asc, desc
+from markupsafe import Markup
+import pdfplumber
+import io
+import re
+from datetime import datetime
 
 bp = Blueprint('finished_goods', __name__, template_folder='templates', url_prefix='/finished_goods')
 
@@ -11,23 +16,14 @@ bp = Blueprint('finished_goods', __name__, template_folder='templates', url_pref
 @permission_required('warehouse')
 def index():
     categories = FinishedProductCategory.query.order_by(FinishedProductCategory.name).all()
-    
     sort_by = request.args.get('sort_by', 'name')
     order = request.args.get('order', 'asc')
 
-    sort_map = {
-        'name': FinishedProduct.name,
-        'quantity': FinishedProduct.quantity_in_stock,
-    }
+    sort_map = {'name': FinishedProduct.name, 'quantity': FinishedProduct.quantity_in_stock}
     sort_column = sort_map.get(sort_by, FinishedProduct.name)
 
-    if order == 'asc':
-        query = FinishedProduct.query.order_by(asc(sort_column))
-    else:
-        query = FinishedProduct.query.order_by(desc(sort_column))
-    
+    query = FinishedProduct.query.order_by(asc(sort_column) if order == 'asc' else desc(sort_column))
     all_products = query.all()
-
     low_stock_products = [p for p in all_products if p.critical_stock_level > 0 and p.quantity_in_stock < p.critical_stock_level]
     
     return render_template('finished_goods_index.html', 
@@ -57,10 +53,8 @@ def manage_categories():
     if request.method == 'POST':
         name = request.form.get('name')
         if name:
-            existing_category = FinishedProductCategory.query.filter_by(name=name).first()
-            if not existing_category:
-                new_category = FinishedProductCategory(name=name)
-                db.session.add(new_category)
+            if not FinishedProductCategory.query.filter_by(name=name).first():
+                db.session.add(FinishedProductCategory(name=name))
                 db.session.commit()
                 flash(f"Dodano nową kategorię: {name}", 'success')
             else:
@@ -102,7 +96,6 @@ def toggle_team_availability(category_id):
     category = FinishedProductCategory.query.get_or_404(category_id)
     category.available_for_team = not category.available_for_team
     db.session.commit()
-    
     status = "udostępniona" if category.available_for_team else "ukryta"
     flash(f"Kategoria '{category.name}' została {status} dla drużyny.", "success")
     return redirect(url_for('finished_goods.manage_categories'))
@@ -112,9 +105,81 @@ def toggle_team_availability(category_id):
 @permission_required('admin')
 def import_sales():
     if request.method == 'POST':
-        # Tutaj w przyszłości będzie logika przetwarzania pliku PDF
-        flash('Funkcjonalność importu sprzedaży nie jest jeszcze zaimplementowana.', 'info')
-        return redirect(url_for('finished_goods.index'))
-    
-    # Na razie tylko wyświetlamy pusty szablon
+        if 'pdf_file' not in request.files:
+            flash('Nie wybrano pliku.', 'danger')
+            return redirect(request.url)
+        file = request.files['pdf_file']
+        if file.filename == '':
+            flash('Nie wybrano pliku.', 'danger')
+            return redirect(request.url)
+        if file and file.filename.endswith('.pdf'):
+            try:
+                pdf_stream = io.BytesIO(file.read())
+                with pdfplumber.open(pdf_stream) as pdf:
+                    text = "".join(page.extract_text() for page in pdf.pages)
+                    
+                    date_match = re.search(r'Data raportu:\s*(\d{4}-\d{2}-\d{2})', text)
+                    if not date_match:
+                        flash('Nie można znaleźć daty raportu w pliku PDF.', 'danger')
+                        return redirect(url_for('finished_goods.index'))
+                    report_date = datetime.strptime(date_match.group(1), '%Y-%m-%d').date()
+
+                    updated_products = []
+                    not_found_codes = []
+
+                    for page in pdf.pages:
+                        tables = page.extract_tables()
+                        for table in tables:
+                            for row in table:
+                                if len(row) > 1 and row[0] and row[1]:
+                                    product_code = row[0]
+                                    try:
+                                        quantity_sold = int(row[1])
+                                    except (ValueError, TypeError):
+                                        continue
+
+                                    products = FinishedProduct.query.filter_by(product_code=product_code).all()
+                                    if not products:
+                                        if product_code not in not_found_codes:
+                                            not_found_codes.append(product_code)
+                                        continue
+
+                                    for product in products:
+                                        log_entry = SalesReportLog.query.filter_by(
+                                            product_id=product.id,
+                                            report_date=report_date
+                                        ).first()
+                                        
+                                        if log_entry:
+                                            quantity_to_deduct = quantity_sold - log_entry.quantity_sold
+                                            log_entry.quantity_sold = quantity_sold
+                                        else:
+                                            quantity_to_deduct = quantity_sold
+                                            new_log = SalesReportLog(
+                                                product_id=product.id,
+                                                report_date=report_date,
+                                                quantity_sold=quantity_sold
+                                            )
+                                            db.session.add(new_log)
+                                        
+                                        if quantity_to_deduct > 0:
+                                            product.quantity_in_stock -= quantity_to_deduct
+                                            if product.name not in [p['name'] for p in updated_products]:
+                                                updated_products.append({'name': product.name, 'deducted': quantity_to_deduct})
+
+                    db.session.commit()
+                    
+                    msg = f"Import zakończony dla raportu z dnia {report_date.strftime('%Y-%m-%d')}.<br>"
+                    if updated_products:
+                        msg += "Zaktualizowano stany dla: <ul>" + "".join(f"<li>{p['name']} (odjęto: {p['deducted']})</li>" for p in updated_products) + "</ul>"
+                    if not_found_codes:
+                        msg += "Nie znaleziono produktów o kodach: " + ", ".join(not_found_codes)
+                    
+                    flash(Markup(msg), 'success')
+
+            except Exception as e:
+                flash(f'Wystąpił błąd podczas przetwarzania pliku PDF: {e}', 'danger')
+
+            return redirect(url_for('finished_goods.index'))
+
     return render_template('import_sales.html')
