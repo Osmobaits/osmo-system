@@ -118,9 +118,13 @@ def import_sales():
                 with pdfplumber.open(pdf_stream) as pdf:
                     text = "".join(page.extract_text() for page in pdf.pages)
                     
-                    date_match = re.search(r'Data raportu:\s*(\d{4}-\d{2}-\d{2})', text)
+                    # --- POPRAWKA TUTAJ ---
+                    # Szukamy nowej frazy "ZA OKRES:"
+                    date_match = re.search(r'ZA OKRES:\s*(\d{4}-\d{2}-\d{2})', text)
+                    # ----------------------
+
                     if not date_match:
-                        flash('Nie można znaleźć daty raportu w pliku PDF.', 'danger')
+                        flash('Nie można znaleźć daty raportu w pliku PDF. Upewnij się, że zawiera frazę "ZA OKRES: RRRR-MM-DD".', 'danger')
                         return redirect(url_for('finished_goods.index'))
                     report_date = datetime.strptime(date_match.group(1), '%Y-%m-%d').date()
 
@@ -130,11 +134,19 @@ def import_sales():
                     for page in pdf.pages:
                         tables = page.extract_tables()
                         for table in tables:
-                            for row in table:
-                                if len(row) > 1 and row[0] and row[1]:
-                                    product_code = row[0]
+                            # Szukamy nagłówka tabeli, aby zidentyfikować właściwe kolumny
+                            try:
+                                header = [h.replace('\n', ' ') if h else '' for h in table[0]]
+                                code_idx = header.index('Kod produktu')
+                                qty_idx = header.index('Ilość sprzedana')
+                            except (ValueError, IndexError):
+                                continue # To nie jest tabela, której szukamy
+
+                            for row in table[1:]: # Iterujemy od drugiego wiersza (pomijamy nagłówek)
+                                if len(row) > max(code_idx, qty_idx) and row[code_idx]:
+                                    product_code = row[code_idx].strip()
                                     try:
-                                        quantity_sold = int(row[1])
+                                        quantity_sold = int(row[qty_idx])
                                     except (ValueError, TypeError):
                                         continue
 
@@ -150,6 +162,7 @@ def import_sales():
                                             report_date=report_date
                                         ).first()
                                         
+                                        quantity_to_deduct = 0
                                         if log_entry:
                                             quantity_to_deduct = quantity_sold - log_entry.quantity_sold
                                             log_entry.quantity_sold = quantity_sold
@@ -164,16 +177,16 @@ def import_sales():
                                         
                                         if quantity_to_deduct > 0:
                                             product.quantity_in_stock -= quantity_to_deduct
-                                            if product.name not in [p['name'] for p in updated_products]:
-                                                updated_products.append({'name': product.name, 'deducted': quantity_to_deduct})
+                                            updated_products.append({'name': product.name, 'deducted': quantity_to_deduct})
 
                     db.session.commit()
                     
                     msg = f"Import zakończony dla raportu z dnia {report_date.strftime('%Y-%m-%d')}.<br>"
                     if updated_products:
-                        msg += "Zaktualizowano stany dla: <ul>" + "".join(f"<li>{p['name']} (odjęto: {p['deducted']})</li>" for p in updated_products) + "</ul>"
+                        updated_names = list(set([p['name'] for p in updated_products]))
+                        msg += "Zaktualizowano stany dla: " + ", ".join(updated_names) + "."
                     if not_found_codes:
-                        msg += "Nie znaleziono produktów o kodach: " + ", ".join(not_found_codes)
+                        msg += "<br><b>Nie znaleziono produktów o kodach:</b> " + ", ".join(not_found_codes)
                     
                     flash(Markup(msg), 'success')
 
