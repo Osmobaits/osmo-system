@@ -118,11 +118,7 @@ def import_sales():
                 with pdfplumber.open(pdf_stream) as pdf:
                     text = "".join(page.extract_text() for page in pdf.pages)
                     
-                    # --- POPRAWKA TUTAJ ---
-                    # Szukamy nowej frazy "ZA OKRES:"
                     date_match = re.search(r'ZA OKRES:\s*(\d{4}-\d{2}-\d{2})', text)
-                    # ----------------------
-
                     if not date_match:
                         flash('Nie można znaleźć daty raportu w pliku PDF. Upewnij się, że zawiera frazę "ZA OKRES: RRRR-MM-DD".', 'danger')
                         return redirect(url_for('finished_goods.index'))
@@ -134,15 +130,14 @@ def import_sales():
                     for page in pdf.pages:
                         tables = page.extract_tables()
                         for table in tables:
-                            # Szukamy nagłówka tabeli, aby zidentyfikować właściwe kolumny
                             try:
                                 header = [h.replace('\n', ' ') if h else '' for h in table[0]]
                                 code_idx = header.index('Kod produktu')
                                 qty_idx = header.index('Ilość sprzedana')
                             except (ValueError, IndexError):
-                                continue # To nie jest tabela, której szukamy
+                                continue 
 
-                            for row in table[1:]: # Iterujemy od drugiego wiersza (pomijamy nagłówek)
+                            for row in table[1:]:
                                 if len(row) > max(code_idx, qty_idx) and row[code_idx]:
                                     product_code = row[code_idx].strip()
                                     try:
@@ -157,6 +152,9 @@ def import_sales():
                                         continue
 
                                     for product in products:
+                                        # --- POPRAWKA TUTAJ: Zapisujemy stan przed zmianą ---
+                                        stock_before = product.quantity_in_stock
+                                        
                                         log_entry = SalesReportLog.query.filter_by(
                                             product_id=product.id,
                                             report_date=report_date
@@ -177,16 +175,31 @@ def import_sales():
                                         
                                         if quantity_to_deduct > 0:
                                             product.quantity_in_stock -= quantity_to_deduct
-                                            updated_products.append({'name': product.name, 'deducted': quantity_to_deduct})
+                                            # --- POPRAWKA TUTAJ: Zapisujemy więcej szczegółów ---
+                                            updated_products.append({
+                                                'name': product.name,
+                                                'before': stock_before,
+                                                'deducted': quantity_to_deduct,
+                                                'after': product.quantity_in_stock
+                                            })
 
                     db.session.commit()
                     
-                    msg = f"Import zakończony dla raportu z dnia {report_date.strftime('%Y-%m-%d')}.<br>"
+                    # --- POPRAWKA TUTAJ: Budujemy nową, bardziej szczegółową wiadomość ---
+                    msg = f"<b>Import zakończony dla raportu z dnia {report_date.strftime('%Y-%m-%d')}.</b><br>"
                     if updated_products:
-                        updated_names = list(set([p['name'] for p in updated_products]))
-                        msg += "Zaktualizowano stany dla: " + ", ".join(updated_names) + "."
+                        msg += "<h5>Zaktualizowano stany magazynowe:</h5><ul class='list-group'>"
+                        for p in updated_products:
+                            msg += (f"<li class='list-group-item'>"
+                                    f"<strong>{p['name']}</strong>: "
+                                    f"Było: {p['before']} &rarr; "
+                                    f"Odjęto: <span class='text-danger'>-{p['deducted']}</span> &rarr; "
+                                    f"Jest: <span class='fw-bold'>{p['after']}</span>"
+                                    f"</li>")
+                        msg += "</ul>"
+                    
                     if not_found_codes:
-                        msg += "<br><b>Nie znaleziono produktów o kodach:</b> " + ", ".join(not_found_codes)
+                        msg += "<br><div class='alert alert-warning mt-2'><b>Nie znaleziono w systemie produktów o kodach:</b> " + ", ".join(not_found_codes) + "</div>"
                     
                     flash(Markup(msg), 'success')
 
