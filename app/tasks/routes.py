@@ -44,8 +44,14 @@ def archive():
 
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
-@permission_required('tasks')
+@permission_required('tasks') # Dajemy dostęp wszystkim z rolą 'tasks'
 def create_task():
+    # --- NOWE, BARDZIEJ SZCZEGÓŁOWE ZABEZPIECZENIA ---
+    # Blokujemy możliwość tworzenia zadań dla członków drużyny, nawet jeśli mają rolę 'tasks'
+    if current_user.has_role('team_member') and not current_user.has_role('admin'):
+        flash('Członkowie drużyny nie mogą tworzyć nowych zadań.', 'danger')
+        return redirect(url_for('tasks.index'))
+
     if request.method == 'POST':
         title = request.form.get('title')
         description = request.form.get('description')
@@ -71,11 +77,9 @@ def create_task():
         )
         db.session.add(new_task)
         
-        # Obsługa załączników
         for file in files:
             if file and file.filename != '':
                 filename = secure_filename(file.filename)
-                # Tworzymy unikalną ścieżkę, aby uniknąć nadpisywania plików
                 unique_filename = f"{datetime.utcnow().timestamp()}_{filename}"
                 filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
                 file.save(filepath)
@@ -85,29 +89,28 @@ def create_task():
 
         db.session.commit()
 
-        # Logowanie aktywności
         assignee_names = ", ".join([u.username for u in assignees])
         log_activity(f"Utworzył nowe zadanie: '{new_task.title}' dla: {assignee_names}",
                      'tasks.task_details', id=new_task.id)
 
-        # Wysyłka powiadomień e-mail (jeśli używasz tej funkcji)
-        # try:
-        #     for user in assignees:
-        #         if user.email:
-        #             send_email(
-        #                 '[OSMO System] Nowe zadanie dla Ciebie',
-        #                 recipients=[user.email],
-        #                 template='email/new_task',
-        #                 user=user,
-        #                 task=new_task
-        #             )
-        # except Exception as e:
-        #     flash(f'Zadanie utworzono, ale wystąpił błąd podczas wysyłania powiadomień e-mail: {e}', 'warning')
-
         flash('Pomyślnie utworzono zadanie.', 'success')
         return redirect(url_for('tasks.index'))
         
-    users = User.query.order_by(User.username).all()
+    # --- INTELIGENTNE FILTROWANIE LISTY UŻYTKOWNIKÓW ---
+    # Admin widzi wszystkich
+    if current_user.has_role('admin'):
+        users = User.query.order_by(User.username).all()
+    # Pracownicy widzą tylko innych pracowników (bez team_member)
+    else:
+        team_member_role = Role.query.filter_by(name='team_member').first()
+        if team_member_role:
+            # Wyklucz użytkowników, którzy mają rolę team_member
+            users = User.query.filter(User.roles.not_(User.roles.any(id=team_member_role.id))).order_by(User.username).all()
+        else:
+            # Na wszelki wypadek, jeśli rola nie istnieje
+            users = User.query.order_by(User.username).all()
+    # -----------------------------------------------------------------
+    
     return render_template('create_task.html', users=users)
 
 @bp.route('/<int:id>')
