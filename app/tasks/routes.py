@@ -44,10 +44,8 @@ def archive():
 
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
-@permission_required('tasks') # Dajemy dostęp wszystkim z rolą 'tasks'
+@permission_required('tasks')
 def create_task():
-    # --- NOWE, BARDZIEJ SZCZEGÓŁOWE ZABEZPIECZENIA ---
-    # Blokujemy możliwość tworzenia zadań dla członków drużyny, nawet jeśli mają rolę 'tasks'
     if current_user.has_role('team_member') and not current_user.has_role('admin'):
         flash('Członkowie drużyny nie mogą tworzyć nowych zadań.', 'danger')
         return redirect(url_for('tasks.index'))
@@ -96,20 +94,17 @@ def create_task():
         flash('Pomyślnie utworzono zadanie.', 'success')
         return redirect(url_for('tasks.index'))
         
-    # --- INTELIGENTNE FILTROWANIE LISTY UŻYTKOWNIKÓW ---
-    # Admin widzi wszystkich
+    # --- POPRAWKA TUTAJ ---
     if current_user.has_role('admin'):
         users = User.query.order_by(User.username).all()
-    # Pracownicy widzą tylko innych pracowników (bez team_member)
     else:
         team_member_role = Role.query.filter_by(name='team_member').first()
         if team_member_role:
-            # Wyklucz użytkowników, którzy mają rolę team_member
-            users = User.query.filter(User.roles.not_(User.roles.any(id=team_member_role.id))).order_by(User.username).all()
+            # Używamy operatora ~ do negacji warunku .any()
+            users = User.query.filter(~User.roles.any(id=team_member_role.id)).order_by(User.username).all()
         else:
-            # Na wszelki wypadek, jeśli rola nie istnieje
             users = User.query.order_by(User.username).all()
-    # -----------------------------------------------------------------
+    # ----------------------
     
     return render_template('create_task.html', users=users)
 
