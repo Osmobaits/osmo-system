@@ -4,7 +4,7 @@ import json
 import time
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, Response, g, send_from_directory
-from app.models import db, User, Task, TaskAttachment
+from app.models import db, User, Task, TaskAttachment, Role
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.decorators import permission_required
