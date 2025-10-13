@@ -23,12 +23,12 @@ def index():
 @login_required
 @permission_required('tasks')
 def create_task():
-    # Zabezpieczenie: Teamowicz (który nie jest adminem) nie może wejść na stronę tworzenia zadań.
     if current_user.has_role('team_member') and not current_user.has_role('admin'):
         flash('Członkowie drużyny nie mogą tworzyć nowych zadań.', 'danger')
         return redirect(url_for('tasks.index'))
 
     if request.method == 'POST':
+        # ... (logika tworzenia zadania, bez zmian)
         title = request.form.get('title')
         description = request.form.get('description')
         priority = request.form.get('priority', type=int)
@@ -43,14 +43,7 @@ def create_task():
             
         assignees = User.query.filter(User.id.in_(assignee_ids)).all()
         
-        new_task = Task(
-            title=title, 
-            description=description, 
-            priority=priority, 
-            due_date=due_date, 
-            assigner_id=current_user.id, 
-            assignees=assignees
-        )
+        new_task = Task(title=title, description=description, priority=priority, due_date=due_date, assigner_id=current_user.id, assignees=assignees)
         db.session.add(new_task)
         
         for file in files:
@@ -64,38 +57,21 @@ def create_task():
                 db.session.add(attachment)
 
         db.session.commit()
-
         assignee_names = ", ".join([u.username for u in assignees])
-        log_activity(f"Utworzył nowe zadanie: '{new_task.title}' dla: {assignee_names}",
-                     'tasks.task_details', id=new_task.id)
-
+        log_activity(f"Utworzył nowe zadanie: '{new_task.title}' dla: {assignee_names}", 'tasks.task_details', id=new_task.id)
         flash('Pomyślnie utworzono zadanie.', 'success')
         return redirect(url_for('tasks.index'))
         
-    # OSTATECZNA, POPRAWIONA LOGIKA FILTROWANIA UŻYTKOWNIKÓW
-    # Admin widzi wszystkich.
+    # Logika filtrowania listy użytkowników
     if current_user.has_role('admin'):
         users = User.query.order_by(User.username).all()
-    # Pracownik widzi wszystkich oprócz "czystych" członków drużyny.
     else:
         team_member_role = Role.query.filter_by(name='team_member').first()
         admin_role = Role.query.filter_by(name='admin').first()
-        
         if team_member_role and admin_role:
-            # Podzapytanie, które znajduje ID użytkowników będących "czystymi" teamowiczami
-            # (mają rolę team_member, ale NIE mają roli admin).
-            pure_team_members_subquery = db.session.query(User.id).filter(
-                User.roles.any(id=team_member_role.id),
-                ~User.roles.any(id=admin_role.id)
-            )
-            
-            # Główna kwerenda, która wybiera wszystkich użytkowników,
-            # których ID NIE ZNAJDUJE SIĘ na liście "czystych" teamowiczów.
-            users = User.query.filter(
-                User.id.not_in(pure_team_members_subquery)
-            ).order_by(User.username).all()
+            pure_team_members_subquery = db.session.query(User.id).filter(User.roles.any(id=team_member_role.id), ~User.roles.any(id=admin_role.id))
+            users = User.query.filter(User.id.not_in(pure_team_members_subquery)).order_by(User.username).all()
         else:
-            # Fallback, jeśli role nie istnieją - pokaż wszystkich.
             users = User.query.order_by(User.username).all()
     
     return render_template('create_task.html', users=users)
@@ -111,6 +87,7 @@ def task_details(id):
 @login_required
 @permission_required('tasks')
 def edit_task(id):
+    # ... (cała funkcja edycji pozostaje bez zmian)
     task = Task.query.get_or_404(id)
     if task.assigner_id != current_user.id and not current_user.has_role('admin'):
         flash('Nie masz uprawnień do edycji tego zadania.', 'danger')
@@ -130,7 +107,6 @@ def edit_task(id):
         flash('Zadanie zostało zaktualizowane.', 'success')
         return redirect(url_for('tasks.task_details', id=id))
     
-    # Logika filtrowania listy użytkowników przy edycji - taka sama jak przy tworzeniu
     if current_user.has_role('admin'):
         users = User.query.order_by(User.username).all()
     else:
@@ -141,7 +117,7 @@ def edit_task(id):
             users = User.query.filter(User.id.not_in(pure_team_members_subquery)).order_by(User.username).all()
         else:
             users = User.query.order_by(User.username).all()
-
+            
     return render_template('edit_task.html', task=task, users=users)
 
 @bp.route('/archive')
@@ -151,32 +127,44 @@ def archive():
     tasks = Task.query.filter_by(status='Zakończone').order_by(Task.creation_date.desc()).all()
     return render_template('tasks_archive.html', tasks=tasks)
 
+# --- POCZĄTEK POPRAWKI ---
 @bp.route('/<int:id>/accept', methods=['POST'])
 @login_required
-@permission_required('tasks')
+# Usunęliśmy @permission_required('tasks')
 def accept_task(id):
     task = Task.query.get_or_404(id)
-    if current_user in task.assignees and task.status == 'Nowe':
+    
+    # Dodajemy szczegółową weryfikację uprawnień wewnątrz funkcji
+    if current_user not in task.assignees:
+        flash('Brak uprawnień do wykonania tej akcji.', 'danger')
+        return redirect(url_for('tasks.task_details', id=id))
+
+    if task.status == 'Nowe':
         task.status = 'Przyjęte'
         db.session.commit()
         flash('Zadanie zostało przyjęte do realizacji.', 'info')
     else:
-        flash("Nie możesz wykonać tej akcji.", "warning")
+        flash(f"Nie można przyjąć zadania, ponieważ ma ono już status '{task.status}'.", "warning")
+        
     return redirect(url_for('tasks.task_details', id=id))
 
 @bp.route('/<int:id>/complete', methods=['POST'])
 @login_required
-@permission_required('tasks')
+# Usunęliśmy @permission_required('tasks')
 def complete_task(id):
     task = Task.query.get_or_404(id)
+    
+    # Używamy już istniejącej, dobrej logiki weryfikacji
     if current_user in task.assignees or current_user.id == task.assigner_id or current_user.has_role('admin'):
         task.status = 'Zakończone'
         db.session.commit()
         log_activity(f"Zakończył zadanie: '{task.title}'", 'tasks.task_details', id=task.id)
         flash('Zadanie zostało oznaczone jako zakończone.', 'success')
     else:
-        flash("Nie możesz wykonać tej akcji.", "warning")
+        flash("Brak uprawnień do wykonania tej akcji.", "danger")
+        
     return redirect(url_for('tasks.task_details', id=id))
+# --- KONIEC POPRAWKI ---
     
 @bp.route('/download/<path:filename>')
 @login_required
@@ -189,6 +177,7 @@ def download_file(filename):
 @login_required
 @permission_required('tasks')
 def remind_task(id):
+    # ... (cała funkcja remind bez zmian)
     task = Task.query.get_or_404(id)
     if current_user.id == task.assigner_id or current_user.has_role('admin'):
         try:
