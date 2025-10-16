@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 from app.utils import log_activity
+from markupsafe import Markup
 
 bp = Blueprint('admin', __name__, template_folder='templates', url_prefix='/admin')
 
