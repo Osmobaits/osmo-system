@@ -54,22 +54,44 @@ def new_order():
     
     if request.method == 'POST':
         notes = request.form.get('notes')
-        new_team_order = TeamOrder(user_id=current_user.id, notes=notes)
-        db.session.add(new_team_order)
         
         has_items = False
+        stock_errors = []
+        order_items_to_add = []
+
+        # --- NOWA LOGIKA: WSTĘPNA WERYFIKACJA STANÓW ---
         available_products = FinishedProduct.query.filter(FinishedProduct.category_id.in_([c.id for c in team_categories])).all()
-        
         for product in available_products:
-            quantity = request.form.get(f'product_{product.id}', type=int)
-            if quantity and quantity > 0:
-                order_item = TeamOrderProduct(order=new_team_order, product_id=product.id, quantity=quantity)
-                db.session.add(order_item)
+            try:
+                quantity = int(request.form.get(f'product_{product.id}', 0))
+            except (ValueError, TypeError):
+                quantity = 0
+
+            if quantity > 0:
                 has_items = True
+                if quantity > product.quantity_in_stock:
+                    stock_errors.append(f"Dla produktu '{product.name}' chcesz zamówić {quantity} szt., a na stanie jest tylko {product.quantity_in_stock} szt.")
+                else:
+                    order_items_to_add.append({'product_id': product.id, 'quantity': quantity})
+        
+        # Jeśli wystąpiły błędy, zatrzymaj proces i pokaż komunikat
+        if stock_errors:
+            error_message = "Nie można złożyć zamówienia z powodu braków w magazynie:<br><ul>" + "".join(f"<li>{error}</li>" for error in stock_errors) + "</ul>"
+            flash(Markup(error_message), 'danger')
+            return redirect(url_for('team_member.new_order'))
 
         if not has_items:
             flash('Twoje zamówienie jest puste. Dodaj przynajmniej jeden produkt.', 'warning')
             return redirect(url_for('team_member.new_order'))
+        # --- KONIEC NOWEJ LOGIKI ---
+
+        # Jeśli walidacja przeszła pomyślnie, utwórz zamówienie
+        new_team_order = TeamOrder(user_id=current_user.id, notes=notes)
+        db.session.add(new_team_order)
+        
+        for item_data in order_items_to_add:
+            order_item = TeamOrderProduct(order=new_team_order, product_id=item_data['product_id'], quantity=item_data['quantity'])
+            db.session.add(order_item)
 
         db.session.commit()
         log_activity(f"Złożył nowe zamówienie drużynowe #{new_team_order.id}")

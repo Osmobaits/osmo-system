@@ -7,13 +7,32 @@
             <form method="POST">
                 {% for category in categories %}
                     <h4 class="mt-4 mb-3 border-bottom pb-2">{{ category.name }}</h4>
-                    <table class="table table-hover">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Produkt</th>
+                                <th style="width: 200px;">Ilość (szt.)</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for product in category.finished_products|sort(attribute='name') %}
                             <tr>
-                                <td><label for="product_{{ product.id }}">{{ product.name }}</label></td>
-                                <td style="width: 150px;">
-                                    <input type="number" class="form-control" name="product_{{ product.id }}" id="product_{{ product.id }}" min="0" value="0">
+                                <td>
+                                    <label for="product_{{ product.id }}">{{ product.name }}</label><br>
+                                    <small class="text-muted">Na stanie: 
+                                        <span class="fw-bold {% if product.quantity_in_stock > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ product.quantity_in_stock }} szt.
+                                        </span>
+                                    </small>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control" 
+                                           name="product_{{ product.id }}" 
+                                           id="product_{{ product.id }}" 
+                                           min="0" 
+                                           max="{{ product.quantity_in_stock }}" 
+                                           value="0"
+                                           {% if product.quantity_in_stock == 0 %}disabled{% endif %}>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -22,7 +41,7 @@
                 {% else %}
                     <p class="text-center text-muted">Administrator nie udostępnił jeszcze żadnych produktów do zamawiania.</p>
                 {% endfor %}
-
+                
                 {% if categories %}
                 <div class="mt-5">
                     <div class="mb-3">
