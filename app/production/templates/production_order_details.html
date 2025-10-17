@@ -47,10 +47,19 @@
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.batch.material.name }}</td>
-                        <td>{{ log.batch.batch_number }}</td>
-                        <td>{{ "%.3f"|format(log.quantity_consumed) }}</td>
-                        <td>{{ log.batch.unit }}</td>
+                        {% if log.batch %}
+                            <td>{{ log.batch.material.name }} <span class="badge bg-secondary">Surowiec</span></td>
+                            <td>{{ log.batch.batch_number }}</td>
+                            <td>{{ "%.3f"|format(log.quantity_consumed) }}</td>
+                            <td>{{ log.batch.unit }}</td>
+                        {% elif log.consumed_from_order %}
+                            <td>{{ log.consumed_from_order.finished_product.name }} <span class="badge bg-info text-dark">Półprodukt</span></td>
+                            <td>Partia #{{ log.consumed_from_order.id }}</td>
+                            <td>{{ "%.3f"|format(log.quantity_consumed) }}</td>
+                            <td>{{ log.consumed_from_order.finished_product.unit }}</td>
+                        {% else %}
+                            <td colspan="4" class="text-danger text-center">Błąd danych w dzienniku produkcji</td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
