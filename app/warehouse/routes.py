@@ -43,7 +43,7 @@ def index():
 
     sort_by = request.args.get('sort_by', 'received_date')
     order = request.args.get('order', 'desc')
-    query = RawMaterialBatch.query.join(RawMaterial)
+    query = RawMaterialBatch.query.join(RawMaterial).filter(RawMaterialBatch.quantity_on_hand > 0)
     sort_map = {
         'received_date': RawMaterialBatch.received_date,
         'name': RawMaterial.name,
