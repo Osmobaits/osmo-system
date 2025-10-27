@@ -4,6 +4,7 @@ from app.models import db, Client, Order, OrderProduct, ClientProduct
 from datetime import datetime
 from flask_login import login_required
 from app.decorators import permission_required
+from app.utils import log_activity
 
 bp = Blueprint('orders', __name__, template_folder='templates', url_prefix='/orders')
 
