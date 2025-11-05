@@ -1,7 +1,8 @@
 # app/__init__.py
 from flask import Flask
 from config import Config
-from .models import db, User, Role, Task
+# ZMIANA: Dodano 'TeamOrder'
+from .models import db, User, Role, Task, TeamOrder
 from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
@@ -143,13 +144,35 @@ def create_app():
             db.session.commit()
             print(f"Pomyślnie dodano rolę '{role_name}' do użytkownika '{username}'.")
 
+    # === POCZĄTEK MODYFIKACJI ===
     @app.context_processor
-    def inject_new_tasks_count():
+    def inject_nav_counts():
+        """Wstrzykuje liczbę nowych zadań i zamówień drużyny do wszystkich szablonów."""
+        new_tasks_count = 0
+        pending_team_orders_count = 0
+        
         if current_user.is_authenticated:
+            # Oblicz liczbę nowych zadań (dla wszystkich poza team_member)
             if not current_user.has_role('team_member'):
-                count = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').count()
-                return dict(new_tasks_count=count)
-        return dict(new_tasks_count=0)
+                try:
+                    count = Task.query.filter(Task.assignees.contains(current_user), Task.status == 'Nowe').count()
+                    new_tasks_count = count
+                except Exception:
+                    pass # Błąd bazy danych (np. przy starcie)
+
+            # Oblicz liczbę zamówień drużyny (tylko dla admina)
+            if current_user.has_role('admin'):
+                try:
+                    team_count = TeamOrder.query.filter_by(status='Oczekuje').count()
+                    pending_team_orders_count = team_count
+                except Exception:
+                    pass # Błąd bazy danych (np. przy starcie)
+                    
+        return dict(
+            new_tasks_count=new_tasks_count, 
+            pending_team_orders_count=pending_team_orders_count
+        )
+    # === KONIEC MODYFIKACJI ===
 
     return app
 
