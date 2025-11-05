@@ -4,19 +4,57 @@
 {% block content %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Panel Administratora</h1>
-        <div>
-            <a href="{{ url_for('admin.manage_team_orders') }}" class="btn btn-warning">Zamówienia Drużyny</a>
-            <a href="{{ url_for('admin.activity_log') }}" class="btn btn-secondary">Historia Aktywności</a>
-            <a href="{{ url_for('reports.inventory_sheet_pdf') }}" class="btn btn-dark" target="_blank">Drukuj Arkusz Inwentaryzacyjny</a>
-            <a href="{{ url_for('admin.all_tasks') }}" class="btn btn-info">Zobacz wszystkie zadania</a>
-            <a href="{{ url_for('admin.statistics') }}" class="btn btn-primary">Statystyki Produkcji</a>
         </div>
-    </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
     {% endwith %}
 
+    <div class="card shadow-sm mb-5">
+        <div class="card-header">
+            <h3>Narzędzia Administracyjne</h3>
+        </div>
+        <div class="card-body">
+            <p>Szybki dostęp do kluczowych modułów administratora.</p>
+            <div class="row g-3"> <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('debtor_tracker.index') }}" class="btn btn-danger btn-lg w-100 p-4">
+                        Trop Dłużników
+                    </a>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('admin.manage_team_orders') }}" class="btn btn-warning btn-lg w-100 p-4">
+                        Zamówienia Drużyny
+                    </a>
+                </div>
+                
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('admin.statistics') }}" class="btn btn-primary btn-lg w-100 p-4">
+                        Statystyki Produkcji
+                    </a>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('admin.all_tasks') }}" class="btn btn-info btn-lg w-100 p-4">
+                        Zobacz wszystkie zadania
+                    </a>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('admin.activity_log') }}" class="btn btn-secondary btn-lg w-100 p-4">
+                        Historia Aktywności
+                    </a>
+                </div>
+                
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ url_for('reports.inventory_sheet_pdf') }}" class="btn btn-dark btn-lg w-100 p-4" target="_blank">
+                        Drukuj Arkusz Inwentaryzacyjny
+                    </a>
+                </div>
+                
+            </div>
+        </div>
+    </div>
     <div class="card shadow-sm mb-5">
         <div class="card-header"><h3>Utwórz nowego użytkownika</h3></div>
         <div class="card-body">
