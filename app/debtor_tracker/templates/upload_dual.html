@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trop Dłużników{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Porównaj Faktury (PDF) z Wpłatami (CSV)</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category or 'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('debtor_tracker.process_files') }}" method="post" enctype="multipart/form-data" class="mt-3">
+            <div class="mb-3">
+                <label for="csv_file" class="form-label">1. Wybierz plik CSV (Wpłaty):</label>
+                <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                 <div class="form-text">Plik z historią wpłat bankowych.</div>
+            </div>
+            <div class="mb-3">
+                <label for="pdf_files" class="form-label">2. Wybierz plik(i) PDF (Faktury):</label>
+                <input type="file" class="form-control" id="pdf_files" name="pdf_files" accept=".pdf" required multiple>
+                <div class="form-text">Możesz wybrać wiele plików PDF jednocześnie (np. trzymając Ctrl lub Shift).</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Przetwórz i Porównaj</button>
+        </form>
+         <hr>
+        <p><small><strong>Uwaga:</strong> Skuteczność odczytu danych z PDF zależy od jego struktury. Konieczne może być dostosowanie wzorców w kodzie.</small></p>
+    </div>
+{% endblock %}

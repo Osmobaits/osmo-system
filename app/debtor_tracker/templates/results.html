@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Wyniki Porównania Dłużników{% endblock %}
+
+{% block content %}
+    <style>
+        /* Usunięto .container-fluid { max-width: 1800px; } aby użyć domyślnej szerokości .container */
+        .card {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        h2 { /* Zmienione z h1 */
+            color: #333;
+            font-size: 2.0rem; /* Mniejszy główny nagłówek */
+        }
+        h3 { /* Zmienione z h2 */
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 1rem;
+            font-size: 1.5rem; /* Mniejsze nagłówki sekcji */
+        }
+        h5 { /* Zmienione z h4 */
+            font-size: 1.1rem;
+        }
+        
+        /* Styl dla tabel */
+        .table-responsive {
+             /* Usunięto max-height: 70vh; aby wyłączyć pionowe przewijanie */
+        }
+        .table {
+            font-size: 0.9rem; /* Zmniejszenie czcionki w tabelach */
+        }
+        .table th {
+            background-color: #f1f3f5;
+            white-space: nowrap; /* Zapobiega łamaniu tekstu w nagłówkach */
+        }
+
+        /* NOWA REGUŁA: Zmniejszenie wysokości wierszy (padding) */
+        .table td, .table th {
+            padding-top: 0.2rem;    /* Zmniejsza górne wypełnienie */
+            padding-bottom: 0.2rem; /* Zmniejsza dolne wypełnienie */
+        }
+        
+        /* --- NOWE STYLE SORTOWANIA --- */
+        .sortable-header {
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px !important; /* Wymuś miejsce na strzałkę */
+        }
+        .sortable-header::after {
+            content: '';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            border: 5px solid transparent;
+            opacity: 0.3;
+            transform: translateY(-50%);
+        }
+        /* Strzałka w górę (sortowanie rosnące) */
+        .sortable-header.sort-asc::after {
+            border-bottom-color: #333;
+            opacity: 1;
+        }
+        /* Strzałka w dół (sortowanie malejące) */
+        .sortable-header.sort-desc::after {
+            border-top-color: #333;
+            opacity: 1;
+        }
+        /* --- KONIEC STYLI SORTOWANIA --- */
+
+        /* Podświetlanie statusu (z Twojego pliku results.html) */
+        .table td:contains("OPŁACONA") { color: #198754; font-weight: bold; }
+        .table td:contains("BŁĘDNA KWOTA") { background-color: #fff3cd; color: #856404; font-weight: bold; }
+        .table td:contains("NIEOPŁACONA") { color: #dc3545; font-weight: bold; }
+        .table td:contains("Wpłata bez faktury (?)") { color: #6c757d; }
+        .table td:contains("OK") { color: #198754; }
+        .table td:contains("Sprawdź Nr") { background-color: #fff3cd; color: #856404; }
+
+        /* Podświetlanie powtarzających się kontrahentów */
+        tr.kontrahent-repeat {
+            background-color: #ffe8cc !important; 
+            font-weight: 500;
+        }
+        tr.kontrahent-repeat td:first-child { font-weight: bold; }
+
+        /* Podsumowanie */
+        .summary-box { background-color: #e9ecef; padding: 1.5rem; border-radius: 0.5rem; }
+        .summary-value { font-size: 1.25rem; font-weight: bold; }
+        .sum-paid { color: #198754; }
+        .sum-unpaid { color: #dc3545; }
+    </style>
+
+    <div class="container mt-4 mb-5">
+        <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Wyniki Porównania</h2>
+                <a href="{{ url_for('debtor_tracker.index') }}" class="btn btn-secondary">Wróć i prześlij nowe pliki</a>
+            </div>
+            
+            <p>Porównano plik CSV <strong>{{ csv_filename }}</strong> z plikami PDF: <strong>{{ pdf_filenames }}</strong>.</p>
+            
+            <div class="row summary-box">
+                <div class="col-md-6">
+                    <h5>Suma opłaconych faktur (wg PDF)</h5>
+                    <div class="summary-value sum-paid">{{ sum_paid_str }} PLN</div>
+                </div>
+                <div class="col-md-6">
+                    <h5>Suma nieopłaconych faktur (wg PDF)</h5>
+                    <div class="summary-value sum-unpaid">{{ sum_unpaid_str }} PLN</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-4">
+            <h3>Opłacone / Błędne Kwoty</h3>
+            <div class="table-responsive">
+                {{ table_paid_html | safe }}
+            </div>
+        </div>
+
+        <div class="card p-4">
+            <h3>Nieopłacone</h3>
+            <p class="text-muted">Wiersze podświetlone na pomarańczowo oznaczają kontrahentów, którzy mają więcej niż jedną nieopłaconą fakturę. Kliknij nagłówek, aby posortować.</p>
+            <div class="table-responsive" id="unpaid-table-container">
+                {{ table_unpaid_html | safe }}
+            </div>
+
+            {% if html_debtor_summary %}
+                <h5 class="mt-5">Podsumowanie zadłużenia kontrahentów</h5>
+                <p class="text-muted">Suma wszystkich nieopłaconych faktur pogrupowana wg kontrahenta. Kliknij nagłówek, aby posortować.</p>
+                <div class="table-responsive" id="debtor-summary-container">
+                    {{ html_debtor_summary | safe }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="card p-4">
+            <h3>Inne wpłaty (bez pasującej faktury w PDF)</h3>
+            <div class="table-responsive">
+                {{ table_other_html | safe }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            function parseCellValue(cell) {
+                if (!cell) return '';
+                const text = cell.textContent || cell.innerText || '';
+                const numStr = text.replace(/PLN|\s/g, '').replace(',', '.');
+                const num = parseFloat(numStr);
+                if (!isNaN(num)) {
+                    return num;
+                }
+                return text.trim().toLowerCase();
+            }
+
+            function sortTable(table, colIndex, ascending) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const direction = ascending ? 1 : -1;
+                const sortedRows = rows.sort((rowA, rowB) => {
+                    const cellA = rowA.querySelectorAll('td')[colIndex];
+                    const cellB = rowB.querySelectorAll('td')[colIndex];
+                    const valueA = parseCellValue(cellA);
+                    const valueB = parseCellValue(cellB);
+                    if (valueA < valueB) return -1 * direction;
+                    if (valueA > valueB) return 1 * direction;
+                    return 0;
+                });
+                tbody.innerHTML = '';
+                tbody.append(...sortedRows);
+            }
+
+            function makeTableSortable(tableContainerId) {
+                const container = document.getElementById(tableContainerId);
+                if (!container) {
+                    console.warn(`Nie znaleziono kontenera tabeli: #${tableContainerId}`);
+                    return;
+                }
+                const table = container.querySelector('table');
+                if (!table) {
+                    console.warn(`Nie znaleziono tabeli w kontenerze: #${tableContainerId}`);
+                    return;
+                }
+                const headers = table.querySelectorAll('thead th');
+                if (!headers) return;
+
+                headers.forEach((header, index) => {
+                    header.classList.add('sortable-header');
+                    header.addEventListener('click', () => {
+                        const isAscending = header.classList.contains('sort-asc');
+                        const newDirectionAsc = !isAscending;
+                        headers.forEach(h => {
+                            h.classList.remove('sort-asc', 'sort-desc');
+                        });
+                        if (newDirectionAsc) {
+                            header.classList.add('sort-asc');
+                        } else {
+                            header.classList.add('sort-desc');
+                        }
+                        sortTable(table, index, newDirectionAsc);
+                    });
+                });
+            }
+
+            makeTableSortable('unpaid-table-container');
+            makeTableSortable('debtor-summary-container');
+        });
+    </script>
+{% endblock %}

@@ -7,7 +7,9 @@ from flask_bcrypt import Bcrypt
 from flask_mail import Mail
 from flask_migrate import Migrate
 import click
+# ZMIANA: Import pytz
 from datetime import timezone, timedelta
+import pytz
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 login_manager = LoginManager()
@@ -15,13 +17,22 @@ bcrypt = Bcrypt()
 mail = Mail()
 migrate = Migrate()
 
+# ZMIANA: Zaktualizowana funkcja czasu
 def format_datetime_local(dt):
     if dt is None:
         return ""
-    cest = timezone(timedelta(hours=2))
+    
+    # Użyj poprawnej strefy czasowej, która rozumie czas letni/zimowy
+    local_tz = pytz.timezone('Europe/Warsaw')
+    
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(cest).strftime('%Y-%m-%d %H:%M')
+        # Załóż, że czas w bazie danych jest w UTC
+        dt = pytz.utc.localize(dt)
+    
+    # Konwertuj do czasu lokalnego (Warszawa)
+    local_dt = dt.astimezone(local_tz)
+    
+    return local_dt.strftime('%Y-%m-%d %H:%M')
 
 def format_day_of_week(dt):
     if dt is None:
@@ -73,6 +84,11 @@ def create_app():
         app.register_blueprint(reports_routes.bp)
         from .team_member import routes as team_member_routes
         app.register_blueprint(team_member_routes.bp)
+        
+        # --- NOWA LINIA ---
+        from .debtor_tracker import routes as debtor_tracker_routes
+        app.register_blueprint(debtor_tracker_routes.bp)
+        # ------------------
         
     @app.cli.command("init-db")
     def init_db_command():
