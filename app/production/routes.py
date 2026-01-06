@@ -9,13 +9,16 @@ from app.utils import log_activity
 
 bp = Blueprint('production', __name__, template_folder='templates', url_prefix='/production')
 
+# app/production/routes.py
+
 @bp.route('/products')
 @login_required
 @permission_required('production')
 def manage_products():
+    # Pobieramy historię zleceń produkcyjnych
     production_history = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
-# Przykład poprawnego przekierowania w routes.py:
-    return redirect(url_for('production.manage_recipe', id=product_id))
+    # Zwracamy szablon listy produktów, a NIE przekierowanie
+    return render_template('manage_finished_products.html', production_history=production_history)
 
 @bp.route('/catalogue', methods=['GET', 'POST'])
 @login_required
