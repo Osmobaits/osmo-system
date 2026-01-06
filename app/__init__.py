@@ -2,7 +2,7 @@
 from flask import Flask
 from config import Config
 # ZMIANA: Dodano 'TeamOrder'
-from .models import db, User, Role, Task, TeamOrder
+from .models import db, User, Role, Task, TeamOrder, RawMaterial, Packaging, FinishedProduct, RecipeComponent
 from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
