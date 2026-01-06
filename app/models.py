@@ -76,6 +76,7 @@ class RawMaterial(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
     critical_stock_level = db.Column(db.Float, nullable=False, default=0)
     batches = db.relationship('RawMaterialBatch', backref='material', lazy=True, cascade="all, delete-orphan")
+    unit_price = db.Column(db.Float, nullable=False, default=0.0) # Cena za jednostkę (np. kg)
 
 class RawMaterialBatch(db.Model):
     __tablename__ = 'raw_material_batches'
@@ -108,6 +109,7 @@ class Packaging(db.Model):
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     critical_stock_level = db.Column(db.Integer, nullable=False, default=0)
     products = db.relationship('ProductPackaging', back_populates='packaging')
+    unit_price = db.Column(db.Float, nullable=False, default=0.0) # Cena za 1 sztukę
     __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_name'),)
 
 class ProductPackaging(db.Model):
@@ -132,6 +134,25 @@ class FinishedProduct(db.Model):
     recipe_components = db.relationship('RecipeComponent', foreign_keys='RecipeComponent.finished_product_id', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
     production_orders = db.relationship('ProductionOrder', back_populates='finished_product', cascade="all, delete-orphan")
     packaging_bill = db.relationship('ProductPackaging', back_populates='product', lazy='dynamic', cascade="all, delete-orphan")
+    
+    def calculate_production_cost(self):
+        """Wylicza koszt wytworzenia 1 jednostki (szt/kg) produktu."""
+        total_cost = 0.0
+        
+        # 1. Koszt składników z receptury
+        for component in self.recipe_components:
+            if component.raw_material:
+                total_cost += component.quantity_required * (component.raw_material.unit_price or 0)
+            elif component.sub_product:
+                # Rekurencyjne obliczenie dla półproduktów
+                total_cost += component.quantity_required * component.sub_product.calculate_production_cost()
+        
+        # 2. Koszt opakowań (BOM)
+        for pkg_item in self.packaging_bill:
+            if pkg_item.packaging:
+                total_cost += pkg_item.quantity_required * (pkg_item.packaging.unit_price or 0)
+                
+        return round(total_cost, 2)
 
 class RecipeComponent(db.Model):
     __tablename__ = 'recipe_components'
