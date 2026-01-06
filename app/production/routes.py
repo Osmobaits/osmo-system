@@ -14,8 +14,8 @@ bp = Blueprint('production', __name__, template_folder='templates', url_prefix='
 @permission_required('production')
 def manage_products():
     production_history = ProductionOrder.query.order_by(ProductionOrder.order_date.desc()).all()
-    return render_template('manage_finished_products.html', production_history=production_history)
-
+# Przykład poprawnego przekierowania w routes.py:
+    return redirect(url_for('production.manage_recipe', id=product_id))
 
 @bp.route('/catalogue', methods=['GET', 'POST'])
 @login_required

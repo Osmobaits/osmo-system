@@ -3,7 +3,9 @@
 <div class="container mt-4">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url_for('production.manage_finished_products') }}">Produkty Gotowe</a></li>
+        <li class="breadcrumb-item">
+    <a href="{{ url_for('production.manage_products') }}">Produkty Gotowe</a>
+</li>
         <li class="breadcrumb-item active">Receptura: {{ product.name }}</li>
       </ol>
     </nav>
