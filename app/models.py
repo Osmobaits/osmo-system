@@ -76,7 +76,8 @@ class RawMaterial(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
     critical_stock_level = db.Column(db.Float, nullable=False, default=0)
     batches = db.relationship('RawMaterialBatch', backref='material', lazy=True, cascade="all, delete-orphan")
-    unit_price = db.Column(db.Float, nullable=False, default=0.0) # Cena za jednostkę (np. kg)
+    unit_price = db.Column(db.Float, nullable=False, default=0.0, server_default="0.0")
+
 
 class RawMaterialBatch(db.Model):
     __tablename__ = 'raw_material_batches'
@@ -109,7 +110,7 @@ class Packaging(db.Model):
     quantity_in_stock = db.Column(db.Integer, nullable=False, default=0)
     critical_stock_level = db.Column(db.Integer, nullable=False, default=0)
     products = db.relationship('ProductPackaging', back_populates='packaging')
-    unit_price = db.Column(db.Float, nullable=False, default=0.0) # Cena za 1 sztukę
+    unit_price = db.Column(db.Float, nullable=False, default=0.0, server_default="0.0")
     __table_args__ = (db.UniqueConstraint('name', name='uq_packaging_name'),)
 
 class ProductPackaging(db.Model):
