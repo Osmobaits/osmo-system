@@ -153,28 +153,27 @@ def edit_material(id):
     categories = Category.query.all()
     
     if request.method == 'POST':
-        # Pobieranie danych z formularza
         material.name = request.form.get('name')
         material.category_id = request.form.get('category_id')
         
-        # Konwersja na float z zabezpieczeniem przed pustym polem
         try:
             material.critical_stock_level = float(request.form.get('critical_stock_level') or 0)
             material.unit_price = float(request.form.get('unit_price') or 0.0)
         except ValueError:
-            flash('Błędny format liczb. Użyj kropki jako separatora.', 'danger')
+            flash('Błędny format liczb.', 'danger')
             return render_template('edit_material.html', material=material, categories=categories)
         
         db.session.commit()
         
-        # Logowanie aktywności (korzystając z Twojej funkcji pomocniczej)
         from app.utils import log_activity
-        log_activity(f"Zaktualizował surowiec: {material.name} (Nowa cena: {material.unit_price} PLN)")
+        log_activity(f"Zaktualizował surowiec: {material.name}")
         
         flash('Surowiec został zaktualizowany.', 'success')
-        return redirect(url_for('warehouse.manage_raw_materials_catalogue'))
+        # POPRAWIONE PRZEKIEROWANIE:
+        return redirect(url_for('warehouse.manage_catalogue'))
         
     return render_template('edit_material.html', material=material, categories=categories)
+    
     
     
 @bp.route('/delete/<int:id>', methods=['POST'])
