@@ -1,120 +1,114 @@
 {% extends "base.html" %}
-{% block title %}Receptura: {{ product.name }}{% endblock %}
-
 {% block content %}
-    <h1 class="text-center mb-4">Receptura dla: <span class="text-primary">{{ product.name }}</span></h1>
-    <div class="mb-4">
-        <a href="{{ url_for('production.manage_catalogue') }}" class="btn btn-secondary">Powrót do Katalogu</a>
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('production.manage_finished_products') }}">Produkty Gotowe</a></li>
+        <li class="breadcrumb-item active">Receptura: {{ product.name }}</li>
+      </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Zarządzaj recepturą: {{ product.name }}</h2>
+        
+        <div class="card border-success bg-light shadow-sm" style="min-width: 300px;">
+            <div class="card-body p-3">
+                <div class="text-uppercase text-muted small fw-bold mb-1">Koszt produkcji (1 {{ product.unit }})</div>
+                <div class="h3 mb-0 text-success fw-bold">
+                    {{ product.calculate_production_cost() }} <span class="h5">PLN</span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
-    {% endwith %}
-
-    <div class="card shadow-sm mb-5">
-        <div class="card-header"><h3>Dodaj składnik do receptury</h3></div>
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Składniki receptury</h5>
+        </div>
         <div class="card-body">
-            <form method="POST">
-                <div class="row align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label">Typ składnika</label>
-                        <select id="component-type-select" name="component_type" class="form-select" required>
-                            <option value="raw_material">Surowiec</option>
-                            <option value="sub_product">Półprodukt</option>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Składnik</th>
+                        <th>Ilość</th>
+                        <th>Jednostka</th>
+                        <th>Cena składowa</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in product.recipe_components %}
+                    <tr>
+                        <td>
+                            {% if comp.raw_material %}
+                                {{ comp.raw_material.name }} <span class="badge bg-info text-dark">Surowiec</span>
+                            {% else %}
+                                {{ comp.sub_product.name }} <span class="badge bg-warning text-dark">Półprodukt</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ comp.quantity_required }}</td>
+                        <td>{{ comp.unit }}</td>
+                        <td>
+                            {% if comp.raw_material %}
+                                {{ (comp.quantity_required * (comp.raw_material.unit_price or 0))|round(2) }} PLN
+                            {% else %}
+                                {{ (comp.quantity_required * (comp.sub_product.calculate_production_cost()))|round(2) }} PLN
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="{{ url_for('production.delete_recipe_component', id=comp.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Usunąć składnik?')">Usuń</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Dodaj nowy składnik</h5>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('production.add_recipe_component', product_id=product.id) }}" method="POST">
+                <div class="row">
+                    <div class="col-md-5 mb-3">
+                        <label class="form-label">Wybierz surowiec LUB półprodukt</label>
+                        <select class="form-select" name="item_id" required>
+                            <optgroup label="Surowce">
+                                {% for m in materials %}
+                                <option value="raw_{{ m.id }}">{{ m.name }} (cena: {{ m.unit_price }} PLN/kg)</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Półprodukty">
+                                {% for fp in finished_products %}
+                                    {% if fp.id != product.id %}
+                                    <option value="sub_{{ fp.id }}">{{ fp.name }} (koszt: {{ fp.calculate_production_cost() }} PLN)</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
                         </select>
                     </div>
-                    <div class="col-md-4" id="raw-material-selector">
-                        <label class="form-label">Surowiec</label>
-                        <select class="form-select" name="raw_material_id">
-                            <option value="">Wybierz surowiec...</option>
-                            {% for material in raw_materials %}
-                            <option value="{{ material.id }}">{{ material.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-4" id="sub-product-selector" style="display: none;">
-                        <label class="form-label">Półprodukt</label>
-                        <select class="form-select" name="sub_product_id">
-                            <option value="">Wybierz półprodukt...</option>
-                            {% for sub_product in sub_products %}
-                            <option value="{{ sub_product.id }}">{{ sub_product.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label">Ilość</label>
-                        <div class="input-group">
-                            <input type="number" step="0.001" class="form-control" name="quantity" required>
-                            <select name="unit" class="form-select">
-                                <option value="kg">kg</option>
-                                <option value="g">g</option>
-                                <option value="ml">ml</option>
-                                <option value="szt.">szt.</option>
-                            </select>
-                        </div>
+                        <input type="number" step="0.001" class="form-control" name="quantity" required>
                     </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">Dodaj</button>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">Jednostka</label>
+                        <select class="form-select" name="unit">
+                            <option value="kg">kg</option>
+                            <option value="szt.">szt.</option>
+                            <option value="l">l</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">Dodaj</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header"><h3>Aktualna receptura</h3></div>
-        <div class="card-body">
-            <ul class="list-group">
-                {% for component in product.recipe_components %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="fw-bold">
-                            {% if component.raw_material %}
-                                {{ component.raw_material.name }} <span class="badge bg-secondary">Surowiec</span>
-                            {% elif component.sub_product %}
-                                {{ component.sub_product.name }} <span class="badge bg-info">Półprodukt</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <form method="POST" action="{{ url_for('production.edit_recipe_component', id=component.id) }}" class="d-flex">
-                            <div class="input-group input-group-sm">
-                                <input type="number" step="0.001" class="form-control" name="quantity" value="{{ component.quantity_required }}">
-                                <select name="unit" class="form-select">
-                                    <option value="kg" {% if component.unit == 'kg' %}selected{% endif %}>kg</option>
-                                    <option value="g" {% if component.unit == 'g' %}selected{% endif %}>g</option>
-                                    <option value="ml" {% if component.unit == 'ml' %}selected{% endif %}>ml</option>
-                                    <option value="szt." {% if component.unit == 'szt.' %}selected{% endif %}>szt.</option>
-                                </select>
-                                <button type="submit" class="btn btn-success ms-2">Zapisz</button>
-                            </div>
-                        </form>
-                        <form method="POST" action="{{ url_for('production.delete_recipe_component', id=component.id) }}" onsubmit="return confirm('Na pewno usunąć?');" class="ms-2">
-                            <button type="submit" class="btn btn-danger btn-sm">Usuń</button>
-                        </form>
-                    </div>
-                </li>
-                {% else %}
-                <li class="list-group-item text-center">Receptura jest pusta. Dodaj pierwszy składnik.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('component-type-select').addEventListener('change', function() {
-            if (this.value === 'raw_material') {
-                document.getElementById('raw-material-selector').style.display = 'block';
-                document.getElementById('sub-product-selector').style.display = 'none';
-                document.querySelector('[name="raw_material_id"]').required = true;
-                document.querySelector('[name="sub_product_id"]').required = false;
-            } else {
-                document.getElementById('raw-material-selector').style.display = 'none';
-                document.getElementById('sub-product-selector').style.display = 'block';
-                document.querySelector('[name="raw_material_id"]').required = false;
-                document.querySelector('[name="sub_product_id"]').required = true;
-            }
-        });
-        document.getElementById('component-type-select').dispatchEvent(new Event('change'));
-    </script>
+</div>
 {% endblock %}

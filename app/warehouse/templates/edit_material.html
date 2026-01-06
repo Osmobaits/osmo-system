@@ -1,49 +1,46 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <title>Edytuj Surowiec</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="container mt-4">
-
-    <h1 class="text-center mb-4">Edytuj Surowiec: {{ material.name }}</h1>
-
-    <div class="card shadow-sm mb-5 mx-auto" style="max-width: 800px;">
-        <div class="card-header">
-            <h3>Zmień dane surowca</h3>
-        </div>
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Edytuj surowiec: {{ material.name }}</h2>
+    <div class="card shadow">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('warehouse.edit_material', id=material.id) }}">
+            <form method="POST">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="name" class="form-label">Nazwa surowca</label>
-                        <input type="text" class="form-control" name="name" value="{{ material.name }}" required>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ material.name }}" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="category_id" class="form-label">Kategoria</label>
-                        <select class="form-select" name="category_id" required>
-                            <option value="">Wybierz kategorię...</option>
-                            {% for category in categories %}
-                            <option value="{{ category.id }}" {% if category.id == material.category_id %}selected{% endif %}>
-                                {{ category.name }}
-                            </option>
+                        <select class="form-select" id="category_id" name="category_id" required>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if cat.id == material.category_id %}selected{% endif %}>{{ cat.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
+
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="critical_stock_level" class="form-label">Poziom krytyczny (np. 10 kg)</label>
-                        <input type="number" step="0.1" class="form-control" name="critical_stock_level" value="{{ material.critical_stock_level }}" required>
+                        <label for="critical_stock_level" class="form-label">Stan krytyczny (kg)</label>
+                        <input type="number" step="0.01" class="form-control" id="critical_stock_level" name="critical_stock_level" value="{{ material.critical_stock_level }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="unit_price" class="form-label">Cena za jednostkę (PLN)</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" class="form-control" id="unit_price" name="unit_price" value="{{ material.unit_price or 0.00 }}">
+                            <span class="input-group-text">PLN</span>
+                        </div>
+                        <small class="text-muted">Podaj cenę netto za 1 kg lub jednostkę miary surowca.</small>
                     </div>
                 </div>
+
                 <div class="mt-3">
-                    <button type="submit" class="btn btn-success">Zapisz zmiany</button>
-                    <a href="{{ url_for('warehouse.manage_catalogue') }}" class="btn btn-secondary">Anuluj</a>
+                    <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                    <a href="{{ url_for('warehouse.manage_raw_materials_catalogue') }}" class="btn btn-secondary">Anuluj</a>
                 </div>
             </form>
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

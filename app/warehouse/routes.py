@@ -145,21 +145,38 @@ def manage_catalogue():
     return render_template('manage_raw_materials_catalogue.html', categories=categories)
 
 
-@bp.route('/edit/<int:id>', methods=['GET', 'POST'])
+@bp.route('/edit_material/<int:id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('warehouse')
 def edit_material(id):
-    material_to_edit = RawMaterial.query.get_or_404(id)
+    material = RawMaterial.query.get_or_404(id)
+    categories = Category.query.all()
+    
     if request.method == 'POST':
-        material_to_edit.name = request.form.get('name')
-        material_to_edit.category_id = int(request.form.get('category_id'))
-        material_to_edit.critical_stock_level = float(request.form.get('critical_stock_level', 0))
+        # Pobieranie danych z formularza
+        material.name = request.form.get('name')
+        material.category_id = request.form.get('category_id')
+        
+        # Konwersja na float z zabezpieczeniem przed pustym polem
+        try:
+            material.critical_stock_level = float(request.form.get('critical_stock_level') or 0)
+            material.unit_price = float(request.form.get('unit_price') or 0.0)
+        except ValueError:
+            flash('Błędny format liczb. Użyj kropki jako separatora.', 'danger')
+            return render_template('edit_material.html', material=material, categories=categories)
+        
         db.session.commit()
-        flash(f"Zaktualizowano surowiec: {material_to_edit.name}", "success")
-        return redirect(url_for('warehouse.manage_catalogue'))
-    all_categories = Category.query.order_by(Category.name).all()
-    return render_template('edit_material.html', material=material_to_edit, categories=all_categories)
-
+        
+        # Logowanie aktywności (korzystając z Twojej funkcji pomocniczej)
+        from app.utils import log_activity
+        log_activity(f"Zaktualizował surowiec: {material.name} (Nowa cena: {material.unit_price} PLN)")
+        
+        flash('Surowiec został zaktualizowany.', 'success')
+        return redirect(url_for('warehouse.manage_raw_materials_catalogue'))
+        
+    return render_template('edit_material.html', material=material, categories=categories)
+    
+    
 @bp.route('/delete/<int:id>', methods=['POST'])
 @login_required
 @permission_required('warehouse')
